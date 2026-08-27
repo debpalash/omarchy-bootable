@@ -62,8 +62,15 @@ Panel {
     id: barButton
     anchors.fill: parent
     bar: root.bar
-    text: "󰕓"
     active: root.opened
+    iconComponent: Component {
+      Image {
+        source: Qt.resolvedUrl("bootable-app-mark.svg")
+        sourceSize.width: Style.space(16)
+        sourceSize.height: Style.space(16)
+        fillMode: Image.PreserveAspectFit
+      }
+    }
     onPressed: function(buttonCode) {
       if (buttonCode === Qt.RightButton || buttonCode === Qt.MiddleButton) bootable.refresh()
       else root.toggle()
@@ -104,13 +111,11 @@ Panel {
           foreground: root.foreground
           fontFamily: root.fontFamily
           iconComponent: Component {
-            Text {
-              text: "󰕓"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.display
-              horizontalAlignment: Text.AlignHCenter
-              verticalAlignment: Text.AlignVCenter
+            Image {
+              source: Qt.resolvedUrl("bootable-mark.svg")
+              sourceSize.width: Style.space(34)
+              sourceSize.height: Style.space(34)
+              fillMode: Image.PreserveAspectFit
             }
           }
         }
