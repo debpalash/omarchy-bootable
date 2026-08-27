@@ -208,6 +208,7 @@ Panel {
 
     foreground: root.foreground
     implicitHeight: rowContent.implicitHeight + Style.space(16)
+    height: implicitHeight
     opacity: enabled ? 1.0 : 0.45
 
     MouseArea {
