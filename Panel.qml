@@ -207,8 +207,8 @@ Panel {
     signal triggered()
 
     foreground: root.foreground
-    implicitHeight: rowContent.implicitHeight + Style.space(16)
-    height: implicitHeight
+    implicitHeight: Style.space(58)
+    height: Style.space(58)
     opacity: enabled ? 1.0 : 0.45
 
     MouseArea {
