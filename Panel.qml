@@ -35,6 +35,18 @@ Panel {
     close()
   }
 
+  function askAgent(task) {
+    var localStatus = "GUI: " + (bootable.guiInstalled ? "installed" : "missing")
+      + "; TUI: " + (bootable.tuiInstalled ? "installed" : "missing")
+      + "; detected version: " + bootable.version
+    var prompt = "Help me " + task + " for Bootable (https://github.com/debpalash/bootable) on this Omarchy system. "
+      + "Inspect the machine and current stable release before acting. Local status: " + localStatus + ". "
+      + "Prefer the official stable package or archive appropriate for this Arch-based machine, verify its published SHA-256 checksum, and make the requested interface command available on PATH. "
+      + "Explain any system change and ask before privileged or destructive actions. Never write to removable media, select a storage device, or weaken Bootable's device-selection and confirmation safety gates."
+    Quickshell.execDetached(["omarchy", "agent", "prompt", prompt])
+    close()
+  }
+
   implicitWidth: barButton.implicitWidth
   implicitHeight: barButton.implicitHeight
 
@@ -54,8 +66,17 @@ Panel {
     function toggle(): void { root.toggle() }
     function refresh(): string { bootable.refresh(); return "ok" }
     function status(): string { return bootable.version }
-    function gui(): string { root.launchGui(); return bootable.guiInstalled ? "launched" : "not-installed" }
-    function tui(): string { root.launchTui(); return bootable.tuiInstalled ? "launched" : "not-installed" }
+    function gui(): string {
+      if (bootable.guiInstalled) root.launchGui()
+      else root.askAgent("install the Bootable desktop GUI")
+      return bootable.guiInstalled ? "launched" : "agent-opened"
+    }
+    function tui(): string {
+      if (bootable.tuiInstalled) root.launchTui()
+      else root.askAgent("install the Bootable terminal UI")
+      return bootable.tuiInstalled ? "launched" : "agent-opened"
+    }
+    function agent(): string { root.askAgent("diagnose and fix my Bootable installation"); return "agent-opened" }
   }
 
   BarIconButton {
@@ -93,8 +114,15 @@ Panel {
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(text) {
-        if (text === "g" || text === "G") root.launchGui()
-        else if (text === "t" || text === "T") root.launchTui()
+        if (text === "g" || text === "G") {
+          if (bootable.guiInstalled) root.launchGui()
+          else root.askAgent("install the Bootable desktop GUI")
+        }
+        else if (text === "t" || text === "T") {
+          if (bootable.tuiInstalled) root.launchTui()
+          else root.askAgent("install the Bootable terminal UI")
+        }
+        else if (text === "a" || text === "A") root.askAgent("diagnose and fix my Bootable installation")
         else if (text === "d" || text === "D") root.openUrl(root.releaseUrl)
         else if (text === "r" || text === "R") bootable.refresh()
       }
@@ -124,7 +152,7 @@ Panel {
           width: parent.width
           text: bootable.error !== "" ? bootable.error : (bootable.installed
             ? "Write operating-system images from the interface you prefer. Device selection and confirmation stay inside Bootable."
-            : "Bootable is not on PATH yet. Download the native package for this machine to get started.")
+            : "Bootable is not on PATH yet. Pick an interface and Omarchy's default agent will help install it.")
           color: bootable.error !== "" ? (bar ? bar.urgent : Color.urgent) : root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -139,22 +167,26 @@ Panel {
 
         ActionRow {
           width: parent.width
-          title: "Desktop GUI"
-          detail: bootable.guiInstalled ? "Open the visual media writer" : "bootable-desktop is not installed"
-          glyph: "󰖯"
+          title: bootable.guiInstalled ? "Desktop GUI" : "Install Desktop GUI with AI"
+          detail: bootable.guiInstalled ? "Open the visual media writer" : "Ask the default Omarchy agent"
+          glyph: bootable.guiInstalled ? "󰖯" : "󰚩"
           shortcut: "G"
-          enabled: bootable.guiInstalled
-          onTriggered: root.launchGui()
+          onTriggered: {
+            if (bootable.guiInstalled) root.launchGui()
+            else root.askAgent("install the Bootable desktop GUI")
+          }
         }
 
         ActionRow {
           width: parent.width
-          title: "Terminal UI"
-          detail: bootable.tuiInstalled ? "Open Bootable in a new terminal" : "bootable is not installed"
-          glyph: "󰆍"
+          title: bootable.tuiInstalled ? "Terminal UI" : "Install Terminal UI with AI"
+          detail: bootable.tuiInstalled ? "Open Bootable in a new terminal" : "Ask the default Omarchy agent"
+          glyph: bootable.tuiInstalled ? "󰆍" : "󰚩"
           shortcut: "T"
-          enabled: bootable.tuiInstalled
-          onTriggered: root.launchTui()
+          onTriggered: {
+            if (bootable.tuiInstalled) root.launchTui()
+            else root.askAgent("install the Bootable terminal UI")
+          }
         }
 
         PanelSeparator {
@@ -186,9 +218,18 @@ Panel {
           onTriggered: root.openUrl(root.repositoryUrl)
         }
 
+        ActionRow {
+          width: parent.width
+          title: "Diagnose or fix with AI"
+          detail: "Open the configured default Omarchy agent"
+          glyph: "󰚩"
+          shortcut: "A"
+          onTriggered: root.askAgent("diagnose and fix my Bootable installation")
+        }
+
         Text {
           width: parent.width
-          text: "R refreshes status  ·  Esc closes"
+          text: "A asks AI  ·  R refreshes  ·  Esc closes"
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
