@@ -133,6 +133,7 @@ Panel {
         }
 
         ActionRow {
+          width: parent.width
           title: "Desktop GUI"
           detail: bootable.guiInstalled ? "Open the visual media writer" : "bootable-desktop is not installed"
           glyph: "󰖯"
@@ -142,6 +143,7 @@ Panel {
         }
 
         ActionRow {
+          width: parent.width
           title: "Terminal UI"
           detail: bootable.tuiInstalled ? "Open Bootable in a new terminal" : "bootable is not installed"
           glyph: "󰆍"
@@ -150,7 +152,10 @@ Panel {
           onTriggered: root.launchTui()
         }
 
-        PanelSeparator { foreground: root.foreground }
+        PanelSeparator {
+          width: parent.width
+          foreground: root.foreground
+        }
 
         PanelSectionHeader {
           text: "PROJECT"
@@ -159,6 +164,7 @@ Panel {
         }
 
         ActionRow {
+          width: parent.width
           title: "Latest stable release"
           detail: "Native packages and checksums"
           glyph: "󰇚"
@@ -167,6 +173,7 @@ Panel {
         }
 
         ActionRow {
+          width: parent.width
           title: "Source and documentation"
           detail: "debpalash/bootable"
           glyph: ""
