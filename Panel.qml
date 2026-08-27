@@ -14,7 +14,6 @@ Panel {
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color dim: Qt.darker(foreground, 1.55)
-  readonly property color accent: bar ? bar.active : Color.mPrimary
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property string releaseUrl: "https://github.com/debpalash/bootable/releases/latest"
   readonly property string repositoryUrl: "https://github.com/debpalash/bootable"
