@@ -1,0 +1,25 @@
+#!/usr/bin/env sh
+set -eu
+
+gui=false
+tui=false
+version="Not installed"
+
+if command -v bootable-desktop >/dev/null 2>&1; then
+  gui=true
+fi
+
+if command -v bootable >/dev/null 2>&1; then
+  tui=true
+  detected="$(bootable --version 2>/dev/null | head -n 1 || true)"
+  if [ -n "$detected" ]; then
+    version="$detected"
+  else
+    version="Installed"
+  fi
+elif [ "$gui" = true ]; then
+  version="Desktop installed"
+fi
+
+escaped_version=$(printf '%s' "$version" | sed 's/\\/\\\\/g; s/"/\\"/g')
+printf '{"guiInstalled":%s,"tuiInstalled":%s,"version":"%s"}\n' "$gui" "$tui" "$escaped_version"

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.debpalash.bootable",
+  "name": "Bootable",
+  "version": "1.0.0",
+  "author": "Palash Deb",
+  "license": "MIT",
+  "description": "A compact launcher for the Bootable GUI and TUI, with local install status and release links.",
+  "kinds": ["bar-widget"],
+  "activation": "on-demand",
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Bootable",
+    "description": "Launch Bootable's desktop or terminal interface and inspect the installed version.",
+    "category": "Development",
+    "aliases": ["bootable", "usb", "media writer", "iso"],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {},
+    "schema": []
+  }
+}
