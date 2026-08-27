@@ -54,6 +54,14 @@ Panel {
     function toggle(): void { root.toggle() }
     function refresh(): string { bootable.refresh(); return "ok" }
     function status(): string { return bootable.version }
+    function debugLayout(): string {
+      var rows = []
+      for (var i = 0; i < content.children.length; i++) {
+        var child = content.children[i]
+        rows.push({ title: String(child.title || child.text || child), height: child.height, implicitHeight: child.implicitHeight, visible: child.visible })
+      }
+      return JSON.stringify(rows)
+    }
     function gui(): string { root.launchGui(); return bootable.guiInstalled ? "launched" : "not-installed" }
     function tui(): string { root.launchTui(); return bootable.tuiInstalled ? "launched" : "not-installed" }
   }
