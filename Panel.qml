@@ -19,6 +19,7 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property string releaseUrl: "https://github.com/debpalash/bootable/releases/latest"
   readonly property string repositoryUrl: "https://github.com/debpalash/bootable"
+  property bool showMore: false
 
   function launchGui() {
     if (!bootable.guiInstalled) return
@@ -118,8 +119,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(420))
-    contentHeight: panel.fittedContentHeight(Style.space(700), Style.space(740))
+    contentWidth: panel.fittedContentWidth(Style.space(400))
+    contentHeight: panel.fittedContentHeight(Math.min(content.implicitHeight, Style.space(680)), Style.space(680))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -138,6 +139,7 @@ Panel {
         }
         else if (text === "a" || text === "A") root.askAgent("diagnose and fix my Bootable installation")
         else if (text === "d" || text === "D") root.openUrl(root.releaseUrl)
+        else if (text === "m" || text === "M") root.showMore = !root.showMore
         else if ((text === "r" || text === "R") && !bootable.writing) bootable.refreshDevices()
       }
 
@@ -174,8 +176,8 @@ Panel {
           Text {
             width: parent.width
             text: bootable.writing
-              ? "The panel may be closed while Bootable keeps writing and verifying."
-              : "Flash an OS image without leaving the Omarchy bar. Every target is still discovered, blocked, reviewed, and confirmed by Bootable."
+              ? "You can close this panel. Writing and verification continue."
+              : "Choose image → select USB → review erase → flash."
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
@@ -183,7 +185,7 @@ Panel {
           }
 
           PanelSectionHeader {
-            text: "CREATE MEDIA"
+            text: "FLASH MEDIA"
             foreground: root.foreground
             fontFamily: root.fontFamily
           }
@@ -244,7 +246,7 @@ Panel {
             Column {
               width: parent.width
               spacing: Style.space(6)
-              visible: bootable.workflow === "target"
+              visible: bootable.workflow === "target" && bootable.imageReport !== null && bootable.sourcePath !== ""
 
               Row {
                 width: parent.width
@@ -445,27 +447,29 @@ Panel {
               }
             }
 
-            Text {
-              width: parent.width
-              visible: bootable.workflow !== "error" && bootable.workflow !== "finished"
-                && bootable.workflow !== "writing" && bootable.operationMessage !== ""
-              text: bootable.operationMessage
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              wrapMode: Text.WordWrap
-            }
+          }
+
+          ActionRow {
+            width: parent.width
+            title: root.showMore ? "Hide extra options" : "More Bootable options"
+            detail: "Full GUI, TUI, downloads, docs, and AI help"
+            glyph: root.showMore ? "󰅀" : "󰅂"
+            shortcut: "M"
+            enabled: !bootable.writing
+            onTriggered: root.showMore = !root.showMore
           }
 
           PanelSeparator {
             width: parent.width
             foreground: root.foreground
+            visible: root.showMore
           }
 
           PanelSectionHeader {
             text: "FULL INTERFACES"
             foreground: root.foreground
             fontFamily: root.fontFamily
+            visible: root.showMore
           }
 
           ActionRow {
@@ -474,6 +478,7 @@ Panel {
             detail: bootable.guiInstalled ? "Open the full visual media writer" : "Ask the default Omarchy agent"
             glyph: bootable.guiInstalled ? "󰖯" : "󰚩"
             shortcut: "G"
+            visible: root.showMore
             onTriggered: {
               if (bootable.guiInstalled) root.launchGui()
               else root.askAgent("install the Bootable desktop GUI")
@@ -486,6 +491,7 @@ Panel {
             detail: bootable.tuiInstalled ? "Open Bootable in a new terminal" : "Ask the default Omarchy agent"
             glyph: bootable.tuiInstalled ? "󰆍" : "󰚩"
             shortcut: "T"
+            visible: root.showMore
             onTriggered: {
               if (bootable.tuiInstalled) root.launchTui()
               else root.askAgent("install the Bootable terminal UI")
@@ -495,12 +501,14 @@ Panel {
           PanelSeparator {
             width: parent.width
             foreground: root.foreground
+            visible: root.showMore
           }
 
           PanelSectionHeader {
             text: "PROJECT"
             foreground: root.foreground
             fontFamily: root.fontFamily
+            visible: root.showMore
           }
 
           ActionRow {
@@ -509,6 +517,7 @@ Panel {
             detail: "Native packages and checksums"
             glyph: "󰇚"
             shortcut: "D"
+            visible: root.showMore
             onTriggered: root.openUrl(root.releaseUrl)
           }
 
@@ -518,6 +527,7 @@ Panel {
             detail: "debpalash/bootable"
             glyph: ""
             shortcut: ""
+            visible: root.showMore
             onTriggered: root.openUrl(root.repositoryUrl)
           }
 
@@ -527,12 +537,13 @@ Panel {
             detail: "Open the configured default Omarchy agent"
             glyph: "󰚩"
             shortcut: "A"
+            visible: root.showMore
             onTriggered: root.askAgent("diagnose and fix my Bootable installation")
           }
 
           Text {
             width: parent.width
-            text: "C chooses image  ·  R refreshes drives  ·  Esc closes"
+            text: "C choose image  ·  M more  ·  Esc close"
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
