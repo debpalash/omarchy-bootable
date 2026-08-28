@@ -18,6 +18,8 @@ Item {
   property string sourcePath: ""
   property var imageReport: null
   property var devices: []
+  property bool devicesLoading: false
+  property string devicesError: ""
   property var selectedTarget: null
   property var writePlan: null
   property bool acknowledged: false
@@ -33,6 +35,23 @@ Item {
   readonly property bool canWrite: workflow === "review" && acknowledged && writePlan !== null && eligible(selectedTarget)
   readonly property int progressPercent: progressKnown && progressTotal > 0
     ? Math.max(0, Math.min(100, Math.round(progressCompleted * 100 / progressTotal))) : 0
+  readonly property int eligibleDeviceCount: {
+    var count = 0
+    for (var index = 0; index < devices.length; index++) {
+      if (eligible(devices[index])) count++
+    }
+    return count
+  }
+  readonly property string removableStatusText: {
+    if (devicesLoading) return "Checking removable drives…"
+    if (devicesError !== "") return "Could not check removable drives"
+    if (devices.length === 0) return "No removable drives connected"
+    if (devices.length === 1 && eligibleDeviceCount === 1) return "1 removable drive ready"
+    if (devices.length === eligibleDeviceCount) return devices.length + " removable drives ready"
+    if (devices.length === 1) return "1 removable drive connected · none eligible"
+    if (eligibleDeviceCount === 0) return devices.length + " removable drives connected · none eligible"
+    return devices.length + " removable drives connected · " + eligibleDeviceCount + " ready"
+  }
 
   function helperPath() {
     return Qt.resolvedUrl("bootable-status").toString().replace(/^file:\/\//, "")
@@ -95,7 +114,7 @@ Item {
       statusProcess.command = [helperPath()]
       statusProcess.running = true
     }
-    if (clientReady && sourcePath !== "" && !writing) refreshDevices()
+    if (clientReady && !writing) refreshDevices()
   }
 
   function applyStatus(raw) {
@@ -107,7 +126,7 @@ Item {
       helperInstalled = data.helperInstalled === true
       version = String(data.version || (installed ? "Installed" : "Not installed"))
       error = ""
-      if (clientReady && sourcePath !== "" && workflow !== "writing") refreshDevices()
+      if (clientReady && workflow !== "writing") refreshDevices()
     } catch (parseError) {
       guiInstalled = false
       tuiInstalled = false
@@ -145,6 +164,8 @@ Item {
     writePlan = null
     acknowledged = false
     devices = []
+    devicesLoading = true
+    devicesError = ""
     operationError = ""
     workflow = sourcePath === "" ? "idle" : "discovering"
     operationMessage = "Looking for removable drives…"
@@ -233,7 +254,6 @@ Item {
     if (writing) return
     sourcePath = ""
     imageReport = null
-    devices = []
     selectedTarget = null
     writePlan = null
     acknowledged = false
@@ -297,15 +317,22 @@ Item {
     running: false
     command: []
     stdout: StdioCollector { id: devicesOutput; waitForEnd: true }
-    stderr: StdioCollector { id: devicesError; waitForEnd: true }
+    stderr: StdioCollector { id: deviceErrorOutput; waitForEnd: true }
     onExited: function(exitCode) {
+      root.devicesLoading = false
       if (exitCode !== 0) {
-        root.fail(String(devicesError.text || "Bootable could not discover removable drives.").trim())
+        root.devicesError = String(deviceErrorOutput.text || "Bootable could not discover removable drives.").trim()
+        if (root.sourcePath !== "" && root.imageReport !== null) root.fail(root.devicesError)
+        else {
+          root.workflow = "idle"
+          root.operationMessage = "Choose an operating-system image to begin."
+        }
         return
       }
       try {
         var rows = JSON.parse(String(devicesOutput.text || "[]"))
         root.devices = Array.isArray(rows) ? rows : []
+        root.devicesError = ""
         if (root.sourcePath === "" || root.imageReport === null) {
           root.workflow = "idle"
           root.operationMessage = "Choose an operating-system image to begin."
@@ -316,7 +343,8 @@ Item {
             : "Choose a removable drive. Internal and system disks stay blocked."
         }
       } catch (parseError) {
-        root.fail("Bootable returned an invalid device list.")
+        root.devicesError = "Bootable returned an invalid device list."
+        if (root.sourcePath !== "" && root.imageReport !== null) root.fail(root.devicesError)
       }
     }
   }

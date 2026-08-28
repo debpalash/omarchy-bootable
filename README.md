@@ -12,6 +12,8 @@ The Bootable icon appears in the right side of the Omarchy bar. Click it to open
 
 The client never auto-selects a target. Internal, read-only, and system disks are visible only as blocked entries. Writing requires Bootable to return a safe plan for the exact selected device, followed by a separate erase acknowledgement. Bootable re-discovers and validates the target again before its root-owned helper writes anything. The panel streams preparation, writing, syncing, and verification progress; closing it does not interrupt an active write.
 
+The compact panel checks removable media as soon as it opens and always shows whether no drive is connected, how many drives are ready, or whether discovery needs to be retried. This status does not select a target.
+
 When Bootable, its streaming client mode, or its privileged helper is missing, the create-media area asks Omarchy's configured default coding agent to install the verified official release. The AI troubleshooting row is always available for diagnosis and repair. The generated prompt tells the agent to explain system changes, ask before privileged or destructive actions, and preserve Bootable's removable-media safety gates.
 
 Bootable itself can be installed from the [latest stable release](https://github.com/debpalash/bootable/releases/latest).
