@@ -79,6 +79,7 @@ Panel {
   Connections {
     target: bootable
     function onCatalogWorkflowChanged() {
+      if (bootable.catalogWorkflow !== "idle") scroll.contentY = 0
       if (bootable.catalogWorkflow === "catalog") {
         Qt.callLater(function() { catalogSearch.forceActiveFocus() })
       }
