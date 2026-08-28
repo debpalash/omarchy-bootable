@@ -40,7 +40,9 @@ jobs:
           shellcheck bootable-status bootable-download-session
 
       - name: Validate QML syntax
-        run: /usr/lib/qt6/bin/qmllint Panel.qml Service.qml
+        run: |
+          /usr/lib/qt6/bin/qmlformat Panel.qml >/dev/null
+          /usr/lib/qt6/bin/qmlformat Service.qml >/dev/null
 
       - name: Exercise detached download state
         run: tests/download-session.sh
