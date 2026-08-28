@@ -22,6 +22,7 @@ Panel {
   property bool showMore: false
 
   readonly property int compactPanelHeight: {
+    if (bootable.catalogWorkflow !== "idle") return Style.space(560)
     if (showMore) return Style.space(500)
     if (!bootable.clientReady) return Style.space(300)
     if (bootable.workflow === "target") return Style.space(500)
@@ -53,11 +54,12 @@ Panel {
     var localStatus = "GUI: " + (bootable.guiInstalled ? "installed" : "missing")
       + "; TUI: " + (bootable.tuiInstalled ? "installed" : "missing")
       + "; client mode: " + (bootable.clientCapable ? "available" : "missing")
+      + "; catalog client: " + (bootable.catalogCapable ? "available" : "missing")
       + "; privileged helper: " + (bootable.helperInstalled ? "installed" : "missing")
       + "; detected version: " + bootable.version
     var prompt = "Help me " + task + " for Bootable (https://github.com/debpalash/bootable) on this Omarchy system. "
       + "Inspect the live machine plus current stable and published release-candidate channels before acting. Local status: " + localStatus + ". "
-      + "Bootable's in-panel client requires version 0.1.2 or newer with write --json-progress. Never downgrade a newer compatible published build to an older stable release that lacks this capability. "
+      + "Bootable's in-panel client requires version 0.1.4 or newer with both write --json-progress and download --json-progress. Never downgrade a newer compatible published build to an older stable release that lacks these capabilities. "
       + "Prefer stable when it satisfies the client requirement; otherwise use the newest published release candidate for this Arch-based machine. Verify the chosen artifact's published SHA-256 checksum, and ensure both Bootable interfaces plus the root-owned privileged helper and polkit policy are installed. "
       + "Explain any system change and ask before privileged or destructive actions. Never write to removable media, select a storage device, or weaken Bootable's device-selection and confirmation safety gates."
     Quickshell.execDetached(["omarchy", "agent", "prompt", prompt])
@@ -73,6 +75,15 @@ Panel {
   }
 
   Service { id: bootable }
+
+  Connections {
+    target: bootable
+    function onCatalogWorkflowChanged() {
+      if (bootable.catalogWorkflow === "catalog") {
+        Qt.callLater(function() { catalogSearch.forceActiveFocus() })
+      }
+    }
+  }
 
   IpcHandler {
     target: root.ipcTarget
@@ -102,6 +113,13 @@ Panel {
       }
       root.askAgent("install or update Bootable so the Omarchy media client is ready")
       return "agent-opened"
+    }
+    function discover(): string {
+      root.open()
+      root.showMore = false
+      if (bootable.catalogCapable) bootable.openCatalog()
+      else root.askAgent("install or update Bootable so catalog downloads support streaming client progress")
+      return bootable.catalogCapable ? "catalog-opened" : "agent-opened"
     }
   }
 
@@ -137,6 +155,7 @@ Panel {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
+      blocked: catalogSearch.activeFocus
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(text) {
@@ -151,6 +170,11 @@ Panel {
         }
         else if (text === "a" || text === "A") root.askAgent("diagnose and fix my Bootable installation")
         else if (text === "d" || text === "D") root.openUrl(root.releaseUrl)
+        else if ((text === "s" || text === "S") && bootable.clientReady) {
+          root.showMore = false
+          if (bootable.catalogCapable) bootable.openCatalog()
+          else root.askAgent("install or update Bootable so catalog downloads support streaming client progress")
+        }
         else if (text === "m" || text === "M") root.showMore = !root.showMore
         else if ((text === "r" || text === "R") && !bootable.writing) bootable.refreshDevices()
       }
@@ -228,21 +252,221 @@ Panel {
             spacing: Style.space(8)
             visible: bootable.clientReady
 
+            RowLayout {
+              width: parent.width
+              spacing: Style.space(8)
+              visible: bootable.sourcePath === "" && bootable.catalogWorkflow === "idle"
+
+              SourceChoice {
+                Layout.fillWidth: true
+                glyph: "󰋩"
+                title: "Local image"
+                detail: "Browse files"
+                shortcut: "C"
+                enabled: !bootable.busy
+                onTriggered: bootable.chooseImage()
+              }
+
+              SourceChoice {
+                Layout.fillWidth: true
+                glyph: "󰇚"
+                title: "Discover ISO"
+                detail: bootable.catalogCapable ? "Search catalog" : "Update needed"
+                shortcut: "S"
+                enabled: !bootable.busy
+                onTriggered: {
+                  root.showMore = false
+                  if (bootable.catalogCapable) bootable.openCatalog()
+                  else root.askAgent("install or update Bootable so catalog downloads support streaming client progress")
+                }
+              }
+            }
+
             ActionRow {
               width: parent.width
-              title: bootable.sourcePath === "" ? "Choose OS image" : bootable.fileName(bootable.sourcePath)
+              visible: bootable.sourcePath !== "" && bootable.catalogWorkflow === "idle"
+              title: bootable.fileName(bootable.sourcePath)
               detail: bootable.imageReport
                 ? bootable.imageKind(bootable.imageReport) + " · " + bootable.formatBytes(bootable.imageReport.size)
                 : "ISO, IMG, RAW, or compressed disk image"
-              glyph: bootable.sourcePath === "" ? "󰋩" : "󰈙"
+              glyph: "󰈙"
               shortcut: "C"
               enabled: !bootable.busy
               onTriggered: bootable.chooseImage()
             }
 
+            Column {
+              width: parent.width
+              spacing: Style.space(8)
+              visible: bootable.catalogWorkflow !== "idle"
+
+              RowLayout {
+                width: parent.width
+                spacing: Style.space(8)
+
+                Text {
+                  Layout.fillWidth: true
+                  text: bootable.selectedDistribution
+                    ? String(bootable.selectedDistribution.name || "ISO releases")
+                    : "DISCOVER IMAGES"
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                  elide: Text.ElideRight
+                }
+
+                PanelActionButton {
+                  iconText: "󰅁"
+                  tooltipText: bootable.selectedDistribution ? "Back to catalog" : "Close catalog"
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  enabled: !bootable.catalogBusy
+                  onClicked: bootable.selectedDistribution ? bootable.backToCatalog() : bootable.closeCatalog()
+                }
+              }
+
+              StatusCard {
+                width: parent.width
+                visible: bootable.catalogWorkflow === "catalog-loading" || bootable.catalogWorkflow === "releases-loading"
+                glyph: "󰔟"
+                title: bootable.catalogWorkflow === "catalog-loading" ? "Loading catalog" : "Finding ISO releases"
+                detail: bootable.catalogMessage
+                tone: root.accent
+              }
+
+              TextField {
+                id: catalogSearch
+                width: parent.width
+                visible: bootable.catalogWorkflow === "catalog"
+                placeholderText: "Search distributions or base…"
+                text: bootable.catalogQuery
+                color: root.foreground
+                placeholderTextColor: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                selectByMouse: true
+                background: Rectangle {
+                  radius: Style.cornerRadius
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.055)
+                  border.color: catalogSearch.activeFocus ? root.accent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18)
+                  border.width: 1
+                }
+                onTextChanged: bootable.catalogQuery = text
+                Keys.onEscapePressed: function(event) {
+                  catalogSearch.focus = false
+                  keyCatcher.forceActiveFocus()
+                  event.accepted = true
+                }
+                onAccepted: {
+                  catalogSearch.focus = false
+                  keyCatcher.forceActiveFocus()
+                }
+              }
+
+              Repeater {
+                model: bootable.catalogWorkflow === "catalog" ? bootable.filteredCatalog : []
+                delegate: ActionRow {
+                  required property var modelData
+                  width: parent.width
+                  title: String(modelData.name || modelData.slug)
+                  detail: "#" + String(modelData.rank || "–") + " · " + String(modelData.based_on || "Independent")
+                  glyph: "󰣇"
+                  shortcut: ""
+                  onTriggered: bootable.loadReleases(modelData)
+                }
+              }
+
+              Repeater {
+                model: bootable.catalogWorkflow === "releases" ? bootable.releases : []
+                delegate: ActionRow {
+                  required property var modelData
+                  required property int index
+                  width: parent.width
+                  title: String(modelData.name || "ISO image")
+                  detail: bootable.formatBytes(modelData.size || 0)
+                    + (modelData.checksum ? " · publisher checksum" : " · checksum unavailable")
+                  glyph: "󰇚"
+                  shortcut: ""
+                  onTriggered: bootable.downloadRelease(modelData, index)
+                }
+              }
+
+              Column {
+                width: parent.width
+                spacing: Style.space(8)
+                visible: bootable.catalogWorkflow === "downloading"
+
+                StatusCard {
+                  width: parent.width
+                  glyph: "󰇚"
+                  title: bootable.downloadPhase
+                  detail: bootable.catalogMessage
+                  tone: root.accent
+                }
+
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(8)
+                  radius: height / 2
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12)
+                  clip: true
+
+                  Rectangle {
+                    height: parent.height
+                    width: bootable.downloadKnown ? parent.width * bootable.downloadPercent / 100 : parent.width * 0.24
+                    radius: parent.radius
+                    color: root.accent
+
+                    SequentialAnimation on x {
+                      running: bootable.downloading && !bootable.downloadKnown
+                      loops: Animation.Infinite
+                      NumberAnimation { from: 0; to: Math.max(0, parent.parent.width - parent.width); duration: 900; easing.type: Easing.InOutSine }
+                      NumberAnimation { from: Math.max(0, parent.parent.width - parent.width); to: 0; duration: 900; easing.type: Easing.InOutSine }
+                    }
+                  }
+                }
+
+                Text {
+                  width: parent.width
+                  text: bootable.downloadKnown
+                    ? bootable.downloadPercent + "% · " + bootable.formatBytes(bootable.downloadCompleted) + " / " + bootable.formatBytes(bootable.downloadTotal)
+                    : "Downloading…"
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+              }
+
+              Column {
+                width: parent.width
+                spacing: Style.space(8)
+                visible: bootable.catalogWorkflow === "catalog-error"
+
+                StatusCard {
+                  width: parent.width
+                  glyph: "󰅚"
+                  title: "Catalog action failed"
+                  detail: bootable.catalogError
+                  tone: root.urgent
+                }
+
+                PrimaryAction {
+                  width: parent.width
+                  title: bootable.selectedDistribution ? "Retry ISO lookup" : "Retry catalog"
+                  detail: "Run the Bootable CLI request again"
+                  glyph: "󰑐"
+                  onTriggered: bootable.selectedDistribution
+                    ? bootable.loadReleases(bootable.selectedDistribution)
+                    : bootable.openCatalog()
+                }
+              }
+            }
+
             StatusCard {
               width: parent.width
-              visible: bootable.busy && !bootable.writing
+              visible: bootable.busy && !bootable.writing && !bootable.downloading
+                && bootable.catalogWorkflow === "idle"
               glyph: "󰔟"
               title: bootable.workflow === "planning" ? "Preparing review" : "Checking media"
               detail: bootable.operationMessage
@@ -252,7 +476,8 @@ Panel {
             Column {
               width: parent.width
               spacing: Style.space(6)
-              visible: bootable.workflow === "target" && bootable.imageReport !== null && bootable.sourcePath !== ""
+              visible: bootable.catalogWorkflow === "idle" && bootable.workflow === "target"
+                && bootable.imageReport !== null && bootable.sourcePath !== ""
 
               PanelSectionHeader {
                 text: "SELECT TARGET"
@@ -284,7 +509,7 @@ Panel {
             Column {
               width: parent.width
               spacing: Style.space(8)
-              visible: bootable.workflow === "review" && bootable.writePlan !== null
+              visible: bootable.catalogWorkflow === "idle" && bootable.workflow === "review" && bootable.writePlan !== null
 
               StatusCard {
                 width: parent.width
@@ -328,7 +553,7 @@ Panel {
             Column {
               width: parent.width
               spacing: Style.space(8)
-              visible: bootable.workflow === "writing"
+              visible: bootable.catalogWorkflow === "idle" && bootable.workflow === "writing"
 
               StatusCard {
                 width: parent.width
@@ -394,7 +619,7 @@ Panel {
             Column {
               width: parent.width
               spacing: Style.space(8)
-              visible: bootable.workflow === "finished"
+              visible: bootable.catalogWorkflow === "idle" && bootable.workflow === "finished"
 
               StatusCard {
                 width: parent.width
@@ -416,7 +641,7 @@ Panel {
             Column {
               width: parent.width
               spacing: Style.space(8)
-              visible: bootable.workflow === "error"
+              visible: bootable.catalogWorkflow === "idle" && bootable.workflow === "error"
 
               StatusCard {
                 width: parent.width
@@ -443,20 +668,21 @@ Panel {
             glyph: root.showMore ? "󰅀" : "󰅂"
             shortcut: "M"
             enabled: !bootable.writing
+            visible: bootable.catalogWorkflow === "idle"
             onTriggered: root.showMore = !root.showMore
           }
 
           PanelSeparator {
             width: parent.width
             foreground: root.foreground
-            visible: root.showMore
+            visible: root.showMore && bootable.catalogWorkflow === "idle"
           }
 
           PanelSectionHeader {
             text: "FULL INTERFACES"
             foreground: root.foreground
             fontFamily: root.fontFamily
-            visible: root.showMore
+            visible: root.showMore && bootable.catalogWorkflow === "idle"
           }
 
           ActionRow {
@@ -465,7 +691,7 @@ Panel {
             detail: bootable.guiInstalled ? "Open the full visual media writer" : "Ask the default Omarchy agent"
             glyph: bootable.guiInstalled ? "󰖯" : "󰚩"
             shortcut: "G"
-            visible: root.showMore
+            visible: root.showMore && bootable.catalogWorkflow === "idle"
             onTriggered: {
               if (bootable.guiInstalled) root.launchGui()
               else root.askAgent("install the Bootable desktop GUI")
@@ -478,7 +704,7 @@ Panel {
             detail: bootable.tuiInstalled ? "Open Bootable in a new terminal" : "Ask the default Omarchy agent"
             glyph: bootable.tuiInstalled ? "󰆍" : "󰚩"
             shortcut: "T"
-            visible: root.showMore
+            visible: root.showMore && bootable.catalogWorkflow === "idle"
             onTriggered: {
               if (bootable.tuiInstalled) root.launchTui()
               else root.askAgent("install the Bootable terminal UI")
@@ -488,14 +714,14 @@ Panel {
           PanelSeparator {
             width: parent.width
             foreground: root.foreground
-            visible: root.showMore
+            visible: root.showMore && bootable.catalogWorkflow === "idle"
           }
 
           PanelSectionHeader {
             text: "PROJECT"
             foreground: root.foreground
             fontFamily: root.fontFamily
-            visible: root.showMore
+            visible: root.showMore && bootable.catalogWorkflow === "idle"
           }
 
           RowLayout {
@@ -530,7 +756,9 @@ Panel {
 
           Text {
             width: parent.width
-            text: "C choose image  ·  M more  ·  Esc close"
+            text: bootable.catalogWorkflow === "idle"
+              ? "C local  ·  S discover  ·  M more  ·  Esc close"
+              : (catalogSearch.activeFocus ? "Enter search  ·  Esc leave search" : "Scroll to browse  ·  Esc close")
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -630,6 +858,71 @@ Panel {
         fontFamily: root.fontFamily
         enabled: !bootable.devicesLoading && !bootable.writing
         onClicked: bootable.refreshDevices()
+      }
+    }
+  }
+
+  component SourceChoice: CursorSurface {
+    id: sourceChoice
+    property string glyph: ""
+    property string title: ""
+    property string detail: ""
+    property string shortcut: ""
+    signal triggered()
+
+    foreground: root.foreground
+    implicitHeight: Style.space(62)
+    height: implicitHeight
+    opacity: enabled ? 1.0 : 0.45
+
+    MouseArea {
+      anchors.fill: parent
+      enabled: sourceChoice.enabled
+      hoverEnabled: true
+      cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+      onClicked: sourceChoice.triggered()
+    }
+
+    RowLayout {
+      anchors.fill: parent
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(8)
+      spacing: Style.space(8)
+
+      Text {
+        text: sourceChoice.glyph
+        color: root.accent
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.heading
+      }
+
+      ColumnLayout {
+        Layout.fillWidth: true
+        spacing: Style.space(1)
+        Text {
+          Layout.fillWidth: true
+          text: sourceChoice.title
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          font.bold: true
+          elide: Text.ElideRight
+        }
+        Text {
+          Layout.fillWidth: true
+          text: sourceChoice.detail
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
+      }
+
+      Text {
+        text: sourceChoice.shortcut
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
       }
     }
   }

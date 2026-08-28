@@ -4,6 +4,7 @@ set -eu
 gui=false
 tui=false
 client_capable=false
+catalog_capable=false
 helper_installed=false
 version="Not installed"
 
@@ -15,6 +16,9 @@ if command -v bootable >/dev/null 2>&1; then
   tui=true
   if bootable write --help 2>/dev/null | grep -q -- '--json-progress'; then
     client_capable=true
+  fi
+  if bootable download --help 2>/dev/null | grep -q -- '--json-progress'; then
+    catalog_capable=true
   fi
   detected="$(bootable --version 2>/dev/null | head -n 1 || true)"
   if [ -n "$detected" ]; then
@@ -34,5 +38,5 @@ for helper in /usr/libexec/bootable-helper /usr/lib/bootable/bootable-helper; do
 done
 
 escaped_version=$(printf '%s' "$version" | sed 's/\\/\\\\/g; s/"/\\"/g')
-printf '{"guiInstalled":%s,"tuiInstalled":%s,"clientCapable":%s,"helperInstalled":%s,"version":"%s"}\n' \
-  "$gui" "$tui" "$client_capable" "$helper_installed" "$escaped_version"
+printf '{"guiInstalled":%s,"tuiInstalled":%s,"clientCapable":%s,"catalogCapable":%s,"helperInstalled":%s,"version":"%s"}\n' \
+  "$gui" "$tui" "$client_capable" "$catalog_capable" "$helper_installed" "$escaped_version"
