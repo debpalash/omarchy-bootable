@@ -95,7 +95,7 @@ Item {
       statusProcess.command = [helperPath()]
       statusProcess.running = true
     }
-    if (clientReady && !writing) refreshDevices()
+    if (clientReady && sourcePath !== "" && !writing) refreshDevices()
   }
 
   function applyStatus(raw) {
@@ -306,10 +306,15 @@ Item {
       try {
         var rows = JSON.parse(String(devicesOutput.text || "[]"))
         root.devices = Array.isArray(rows) ? rows : []
-        root.workflow = "target"
-        root.operationMessage = root.devices.length === 0
-          ? "No drives found. Connect a removable USB drive and refresh."
-          : "Choose a removable drive. Internal and system disks stay blocked."
+        if (root.sourcePath === "" || root.imageReport === null) {
+          root.workflow = "idle"
+          root.operationMessage = "Choose an operating-system image to begin."
+        } else {
+          root.workflow = "target"
+          root.operationMessage = root.devices.length === 0
+            ? "No removable drive detected. Connect one, then refresh."
+            : "Choose a removable drive. Internal and system disks stay blocked."
+        }
       } catch (parseError) {
         root.fail("Bootable returned an invalid device list.")
       }
