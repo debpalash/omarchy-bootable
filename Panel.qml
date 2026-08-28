@@ -22,7 +22,10 @@ Panel {
   property bool showMore: false
 
   readonly property int compactPanelHeight: {
-    if (bootable.catalogWorkflow !== "idle") return Style.space(560)
+    if (bootable.catalogWorkflow === "catalog" || bootable.catalogWorkflow === "releases") return Style.space(430)
+    if (bootable.catalogWorkflow === "downloading") return Style.space(350)
+    if (bootable.catalogWorkflow === "catalog-error") return Style.space(390)
+    if (bootable.catalogWorkflow !== "idle") return Style.space(300)
     if (showMore) return Style.space(500)
     if (!bootable.clientReady) return Style.space(300)
     if (bootable.workflow === "target") return Style.space(500)
@@ -79,7 +82,10 @@ Panel {
   Connections {
     target: bootable
     function onCatalogWorkflowChanged() {
-      if (bootable.catalogWorkflow !== "idle") scroll.contentY = 0
+      if (bootable.catalogWorkflow !== "idle") {
+        scroll.contentY = 0
+        catalogResults.contentY = 0
+      }
       if (bootable.catalogWorkflow === "catalog") {
         Qt.callLater(function() { catalogSearch.forceActiveFocus() })
       }
@@ -151,7 +157,9 @@ Panel {
     open: root.opened
     focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(360))
-    contentHeight: panel.fittedContentHeight(Math.min(content.implicitHeight, root.compactPanelHeight), root.compactPanelHeight)
+    contentHeight: bootable.catalogWorkflow === "idle"
+      ? panel.fittedContentHeight(Math.min(content.implicitHeight, root.compactPanelHeight), root.compactPanelHeight)
+      : panel.fittedContentHeight(root.compactPanelHeight, root.compactPanelHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -186,6 +194,7 @@ Panel {
         clip: true
         contentWidth: width
         contentHeight: content.implicitHeight
+        interactive: bootable.catalogWorkflow === "idle"
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
@@ -365,31 +374,49 @@ Panel {
                 }
               }
 
-              Repeater {
-                model: bootable.catalogWorkflow === "catalog" ? bootable.filteredCatalog : []
-                delegate: ActionRow {
-                  required property var modelData
-                  width: parent.width
-                  title: String(modelData.name || modelData.slug)
-                  detail: "#" + String(modelData.rank || "–") + " · " + String(modelData.based_on || "Independent")
-                  glyph: "󰣇"
-                  shortcut: ""
-                  onTriggered: bootable.loadReleases(modelData)
-                }
-              }
+              Flickable {
+                id: catalogResults
+                width: parent.width
+                height: Style.space(180)
+                visible: bootable.catalogWorkflow === "catalog" || bootable.catalogWorkflow === "releases"
+                clip: true
+                contentWidth: width
+                contentHeight: resultRows.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-              Repeater {
-                model: bootable.catalogWorkflow === "releases" ? bootable.releases : []
-                delegate: ActionRow {
-                  required property var modelData
-                  required property int index
-                  width: parent.width
-                  title: String(modelData.name || "ISO image")
-                  detail: bootable.formatBytes(modelData.size || 0)
-                    + (modelData.checksum ? " · publisher checksum" : " · checksum unavailable")
-                  glyph: "󰇚"
-                  shortcut: ""
-                  onTriggered: bootable.downloadRelease(modelData, index)
+                Column {
+                  id: resultRows
+                  width: catalogResults.width - Style.space(8)
+                  spacing: Style.space(4)
+
+                  Repeater {
+                    model: bootable.catalogWorkflow === "catalog" ? bootable.filteredCatalog : []
+                    delegate: ActionRow {
+                      required property var modelData
+                      width: parent.width
+                      title: String(modelData.name || modelData.slug)
+                      detail: "#" + String(modelData.rank || "–") + " · " + String(modelData.based_on || "Independent")
+                      glyph: "󰣇"
+                      shortcut: ""
+                      onTriggered: bootable.loadReleases(modelData)
+                    }
+                  }
+
+                  Repeater {
+                    model: bootable.catalogWorkflow === "releases" ? bootable.releases : []
+                    delegate: ActionRow {
+                      required property var modelData
+                      required property int index
+                      width: parent.width
+                      title: String(modelData.name || "ISO image")
+                      detail: bootable.formatBytes(modelData.size || 0)
+                        + (modelData.checksum ? " · publisher checksum" : " · checksum unavailable")
+                      glyph: "󰇚"
+                      shortcut: ""
+                      onTriggered: bootable.downloadRelease(modelData, index)
+                    }
+                  }
                 }
               }
 
@@ -729,7 +756,7 @@ Panel {
             width: parent.width
             height: Style.space(62)
             spacing: Style.space(8)
-            visible: root.showMore
+            visible: root.showMore && bootable.catalogWorkflow === "idle"
 
             CompactProjectLink {
               Layout.fillWidth: true
@@ -759,7 +786,9 @@ Panel {
             width: parent.width
             text: bootable.catalogWorkflow === "idle"
               ? "C local  ·  S discover  ·  M more  ·  Esc close"
-              : (catalogSearch.activeFocus ? "Enter search  ·  Esc leave search" : "Scroll to browse  ·  Esc close")
+              : (bootable.downloading
+                ? "Safe to close · download continues"
+                : (catalogSearch.activeFocus ? "Enter search  ·  Esc leave search" : "Scroll to browse  ·  Esc close"))
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
