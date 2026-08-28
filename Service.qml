@@ -56,16 +56,37 @@ Item {
     ? Math.max(0, Math.min(100, Math.round(progressCompleted * 100 / progressTotal))) : 0
   readonly property int downloadPercent: downloadKnown && downloadTotal > 0
     ? Math.max(0, Math.min(100, Math.round(downloadCompleted * 100 / downloadTotal))) : 0
+  readonly property string appVersionLabel: {
+    var detected = String(version || "").trim()
+    var match = detected.match(/^bootable\s+(.+)$/i)
+    if (match) return "APP · v" + String(match[1]).replace(/^v/i, "")
+    return "APP · " + detected
+  }
   readonly property var filteredCatalog: {
     var query = String(catalogQuery || "").trim().toLowerCase()
     var rows = []
     for (var index = 0; index < catalog.length; index++) {
       var item = catalog[index]
-      var haystack = [item.name || "", item.slug || "", item.based_on || ""].join(" ").toLowerCase()
-      if (query === "" || haystack.indexOf(query) !== -1) rows.push(item)
+      if (catalogItemMatches(item, query)) rows.push(item)
       if (rows.length >= 30) break
     }
     return rows
+  }
+  readonly property int catalogMatchCount: {
+    var query = String(catalogQuery || "").trim().toLowerCase()
+    var count = 0
+    for (var index = 0; index < catalog.length; index++) {
+      if (catalogItemMatches(catalog[index], query)) count++
+    }
+    return count
+  }
+  readonly property string catalogResultText: {
+    var query = String(catalogQuery || "").trim()
+    if (query === "") return catalog.length + (catalog.length === 1 ? " distribution" : " distributions")
+      + (catalog.length > 30 ? " · showing first 30" : "") + " · name, slug, or base family"
+    if (catalogMatchCount === 0) return "No distributions match “" + query + "”"
+    return catalogMatchCount + (catalogMatchCount === 1 ? " distribution matches “" : " distributions match “")
+      + query + "”" + (catalogMatchCount > 30 ? " · showing first 30" : "") + " · name, slug, or base family"
   }
   readonly property int eligibleDeviceCount: {
     var count = 0
@@ -96,6 +117,34 @@ Item {
   function fileName(path) {
     var parts = String(path || "").split("/")
     return parts.length > 0 ? parts[parts.length - 1] : ""
+  }
+
+  function catalogFieldMatches(value, term) {
+    var field = String(value || "").toLowerCase()
+    if (term.length > 2) return field.indexOf(term) !== -1
+    var words = field.split(/[^a-z0-9]+/)
+    for (var index = 0; index < words.length; index++) {
+      if (words[index].indexOf(term) === 0) return true
+    }
+    return false
+  }
+
+  function catalogItemMatches(item, query) {
+    var normalized = String(query || "").trim().toLowerCase()
+    if (normalized === "") return true
+    var terms = normalized.split(/\s+/)
+    var fields = [item && item.name || "", item && item.slug || "", item && item.based_on || ""]
+    for (var termIndex = 0; termIndex < terms.length; termIndex++) {
+      var matched = false
+      for (var fieldIndex = 0; fieldIndex < fields.length; fieldIndex++) {
+        if (catalogFieldMatches(fields[fieldIndex], terms[termIndex])) {
+          matched = true
+          break
+        }
+      }
+      if (!matched) return false
+    }
+    return true
   }
 
   function formatBytes(value) {

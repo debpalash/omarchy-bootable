@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.debpalash.bootable",
   "name": "Bootable",
-  "version": "1.4.6",
+  "version": "1.5.0",
   "author": "Palash Deb",
   "license": "MIT",
   "description": "An AI-native Bootable client for searching ISO releases, downloading or choosing images, reviewing removable targets, and flashing with live progress.",

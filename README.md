@@ -6,7 +6,7 @@ A keyboard-friendly Omarchy bar client for [Bootable](https://github.com/debpala
 
 ### Choose an image source
 
-<p align="center"><img src="preview.png" width="553" alt="Bootable Omarchy panel offering local image and Discover ISO choices"></p>
+<p align="center"><img src="preview.png" width="540" alt="Bootable Omarchy panel showing its brand mark, removable-drive status, and local or catalog image choices"></p>
 
 ### Review the loaded image and removable target
 
@@ -14,7 +14,7 @@ A keyboard-friendly Omarchy bar client for [Bootable](https://github.com/debpala
 
 ### Search Bootable's distribution catalog
 
-<p align="center"><img src="docs/screenshots/discover-images.png" width="550" alt="Bootable Omarchy panel searching distributions for Omarchy and related results"></p>
+<p align="center"><img src="docs/screenshots/discover-images.png" width="540" alt="Bootable Omarchy panel showing two prefix matches for the live om search"></p>
 
 ## Install
 
@@ -26,7 +26,9 @@ The Bootable icon appears in the right side of the Omarchy bar. Click it to open
 
 After loading an image, select its source row to return to the Local image and Discover ISO choices. This lets pointer users switch files or distributions without leaving the client; the `C` and `S` shortcuts remain available directly.
 
-The plugin delegates its media workflow to Bootable's CLI API: `catalog --json` → `releases --json` → `download --json-progress` → `inspect --json` → `devices --json` → `plan --json` → `write --json-progress`. Distribution results stay inside a bounded scrolling list. A verified download is automatically loaded as the source image, but target selection and erase acknowledgement remain explicit.
+The plugin delegates its media workflow to Bootable's CLI API: `catalog --json` → `releases --json` → `download --json-progress` → `inspect --json` → `devices --json` → `plan --json` → `write --json-progress`. Distribution results update live inside a bounded scrolling list, show the active result count, and label selection and download actions explicitly. Short queries match word prefixes, so `om` finds Omarchy without pulling in unrelated names such as ChromeOS. A verified download is automatically loaded as the source image, but target selection and erase acknowledgement remain explicit.
+
+The panel uses a nearly opaque surface for readable text over busy wallpapers and keeps its context-sensitive keyboard help visible at the bottom.
 
 Downloads run as a detached per-user systemd service and keep their progress under the user's XDG state directory. Closing the panel, moving it out of view, or restarting Omarchy Shell does not interrupt the transfer; reopening the panel restores the latest phase, byte count, percentage, speed, and ETA reported by Bootable. Only one managed ISO download runs at a time.
 
