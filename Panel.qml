@@ -22,7 +22,7 @@ Panel {
   property bool showMore: false
 
   readonly property int compactPanelHeight: {
-    if (showMore) return Style.space(560)
+    if (showMore) return Style.space(500)
     if (!bootable.clientReady) return Style.space(300)
     if (bootable.workflow === "target") return Style.space(500)
     if (bootable.workflow === "review") return Style.space(540)
@@ -497,34 +497,34 @@ Panel {
             visible: root.showMore
           }
 
-          ActionRow {
+          RowLayout {
             width: parent.width
-            title: "Latest stable release"
-            detail: "Native packages and checksums"
-            glyph: "󰇚"
-            shortcut: "D"
+            height: Style.space(62)
+            spacing: Style.space(8)
             visible: root.showMore
-            onTriggered: root.openUrl(root.releaseUrl)
-          }
 
-          ActionRow {
-            width: parent.width
-            title: "Source and documentation"
-            detail: "debpalash/bootable"
-            glyph: ""
-            shortcut: ""
-            visible: root.showMore
-            onTriggered: root.openUrl(root.repositoryUrl)
-          }
+            CompactProjectLink {
+              Layout.fillWidth: true
+              glyph: "󰇚"
+              title: "Release"
+              shortcut: "D"
+              onTriggered: root.openUrl(root.releaseUrl)
+            }
 
-          ActionRow {
-            width: parent.width
-            title: "Diagnose or fix with AI"
-            detail: "Open the configured default Omarchy agent"
-            glyph: "󰚩"
-            shortcut: "A"
-            visible: root.showMore
-            onTriggered: root.askAgent("diagnose and fix my Bootable installation")
+            CompactProjectLink {
+              Layout.fillWidth: true
+              glyph: ""
+              title: "Source"
+              onTriggered: root.openUrl(root.repositoryUrl)
+            }
+
+            CompactProjectLink {
+              Layout.fillWidth: true
+              glyph: "󰚩"
+              title: "AI help"
+              shortcut: "A"
+              onTriggered: root.askAgent("diagnose and fix my Bootable installation")
+            }
           }
 
           Text {
@@ -669,6 +669,47 @@ Panel {
       }
       Text { text: compactAction.shortcut; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
       Text { text: "󰁔"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+    }
+  }
+
+  component CompactProjectLink: CursorSurface {
+    id: projectLink
+    property string glyph: ""
+    property string title: ""
+    property string shortcut: ""
+    signal triggered()
+
+    foreground: root.foreground
+    implicitHeight: Style.space(62)
+    height: implicitHeight
+
+    MouseArea {
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: projectLink.triggered()
+    }
+
+    ColumnLayout {
+      anchors.centerIn: parent
+      spacing: Style.space(2)
+
+      Text {
+        Layout.alignment: Qt.AlignHCenter
+        text: projectLink.glyph
+        color: root.accent
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.heading
+      }
+
+      Text {
+        Layout.alignment: Qt.AlignHCenter
+        text: projectLink.title + (projectLink.shortcut !== "" ? "  " + projectLink.shortcut : "")
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+      }
     }
   }
 
