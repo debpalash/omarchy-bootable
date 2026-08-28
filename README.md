@@ -2,6 +2,20 @@
 
 A keyboard-friendly Omarchy bar client for [Bootable](https://github.com/debpalash/bootable). Search Bootable's distribution catalog and ISO releases or choose a local image, explicitly select an eligible removable drive, review the erase plan, and follow live download/write progress without leaving the bar. The full desktop GUI and terminal UI remain one click away.
 
+## Screenshots
+
+### Choose an image source
+
+<p align="center"><img src="preview.png" width="553" alt="Bootable Omarchy panel offering local image and Discover ISO choices"></p>
+
+### Review the loaded image and removable target
+
+<p align="center"><img src="docs/screenshots/loaded-image.png" width="565" alt="Bootable Omarchy panel showing a loaded Omarchy ISO and an eligible removable SanDisk drive"></p>
+
+### Search Bootable's distribution catalog
+
+<p align="center"><img src="docs/screenshots/discover-images.png" width="550" alt="Bootable Omarchy panel searching distributions for Omarchy and related results"></p>
+
 ## Install
 
 ```bash
