@@ -21,21 +21,6 @@ Panel {
   readonly property string repositoryUrl: "https://github.com/debpalash/bootable"
   property bool showMore: false
 
-  readonly property int compactPanelHeight: {
-    if (bootable.catalogWorkflow === "catalog" || bootable.catalogWorkflow === "releases") return Style.space(430)
-    if (bootable.catalogWorkflow === "downloading") return Style.space(350)
-    if (bootable.catalogWorkflow === "catalog-error") return Style.space(390)
-    if (bootable.catalogWorkflow !== "idle") return Style.space(300)
-    if (showMore) return Style.space(500)
-    if (!bootable.clientReady) return Style.space(300)
-    if (bootable.workflow === "target") return Style.space(500)
-    if (bootable.workflow === "review") return Style.space(540)
-    if (bootable.workflow === "writing") return Style.space(430)
-    if (bootable.workflow === "finished") return Style.space(350)
-    if (bootable.workflow === "error") return Style.space(410)
-    return Style.space(285)
-  }
-
   function launchGui() {
     if (!bootable.guiInstalled) return
     Quickshell.execDetached(["bootable-desktop"])
@@ -157,9 +142,9 @@ Panel {
     open: root.opened
     focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(360))
-    contentHeight: bootable.catalogWorkflow === "idle"
-      ? panel.fittedContentHeight(Math.min(content.implicitHeight, root.compactPanelHeight), root.compactPanelHeight)
-      : root.compactPanelHeight
+    // Deliberately literal: every workflow uses one stable outer card. Long
+    // content scrolls inside instead of resizing the panel against the screen.
+    contentHeight: 430
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -194,7 +179,7 @@ Panel {
         clip: true
         contentWidth: width
         contentHeight: content.implicitHeight
-        interactive: bootable.catalogWorkflow === "idle"
+        interactive: contentHeight > height && bootable.catalogWorkflow === "idle"
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
