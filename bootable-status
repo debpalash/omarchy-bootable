@@ -3,6 +3,8 @@ set -eu
 
 gui=false
 tui=false
+client_capable=false
+helper_installed=false
 version="Not installed"
 
 if command -v bootable-desktop >/dev/null 2>&1; then
@@ -11,6 +13,9 @@ fi
 
 if command -v bootable >/dev/null 2>&1; then
   tui=true
+  if bootable write --help 2>/dev/null | grep -q -- '--json-progress'; then
+    client_capable=true
+  fi
   detected="$(bootable --version 2>/dev/null | head -n 1 || true)"
   if [ -n "$detected" ]; then
     version="$detected"
@@ -21,5 +26,13 @@ elif [ "$gui" = true ]; then
   version="Desktop installed"
 fi
 
+for helper in /usr/libexec/bootable-helper /usr/lib/bootable/bootable-helper; do
+  if [ -f "$helper" ] && [ -x "$helper" ]; then
+    helper_installed=true
+    break
+  fi
+done
+
 escaped_version=$(printf '%s' "$version" | sed 's/\\/\\\\/g; s/"/\\"/g')
-printf '{"guiInstalled":%s,"tuiInstalled":%s,"version":"%s"}\n' "$gui" "$tui" "$escaped_version"
+printf '{"guiInstalled":%s,"tuiInstalled":%s,"clientCapable":%s,"helperInstalled":%s,"version":"%s"}\n' \
+  "$gui" "$tui" "$client_capable" "$helper_installed" "$escaped_version"
