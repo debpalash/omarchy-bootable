@@ -1,6 +1,6 @@
 # Bootable for Omarchy
 
-A keyboard-friendly Omarchy bar client for [Bootable](https://github.com/debpalash/bootable). Choose an OS image, explicitly select an eligible removable drive, review the erase plan, and follow live phase, byte, and percentage progress without leaving the bar. The full desktop GUI and terminal UI remain one click away.
+A keyboard-friendly Omarchy bar client for [Bootable](https://github.com/debpalash/bootable). Search Bootable's distribution catalog and ISO releases or choose a local image, explicitly select an eligible removable drive, review the erase plan, and follow live download/write progress without leaving the bar. The full desktop GUI and terminal UI remain one click away.
 
 ## Install
 
@@ -8,7 +8,9 @@ A keyboard-friendly Omarchy bar client for [Bootable](https://github.com/debpala
 omarchy plugin add https://github.com/debpalash/omarchy-bootable.git --enable --yes
 ```
 
-The Bootable icon appears in the right side of the Omarchy bar. Click it to open the panel. Press `C` to choose an image, `R` to refresh removable drives, `G` for the GUI, `T` for the TUI, `A` for AI troubleshooting, or `D` for downloads.
+The Bootable icon appears in the right side of the Omarchy bar. Click it to open the panel. Press `C` to choose a local image, `S` to search the ISO catalog, `R` to refresh removable drives, `G` for the GUI, `T` for the TUI, or `A` for AI troubleshooting.
+
+The plugin delegates its media workflow to Bootable's CLI API: `catalog --json` → `releases --json` → `download --json-progress` → `inspect --json` → `devices --json` → `plan --json` → `write --json-progress`. A verified download is automatically loaded as the source image, but target selection and erase acknowledgement remain explicit.
 
 The client never auto-selects a target. Internal, read-only, and system disks are visible only as blocked entries. Writing requires Bootable to return a safe plan for the exact selected device, followed by a separate erase acknowledgement. Bootable re-discovers and validates the target again before its root-owned helper writes anything. The panel streams preparation, writing, syncing, and verification progress; closing it does not interrupt an active write.
 
@@ -35,7 +37,7 @@ Removal deletes only this plugin's Omarchy-managed checkout and settings. The pl
 ## Dependencies and permissions
 
 - Omarchy 4 or newer with the Quickshell plugin API
-- Bootable 0.1.2 or newer with `bootable`, the root-owned `bootable-helper`, and its Polkit policy for the in-panel media client
+- Bootable 0.1.4 or newer with streaming download/write client modes, the root-owned `bootable-helper`, and its Polkit policy for the complete in-panel client
 - Optional: `bootable-desktop` for the full GUI action
 - Uses Omarchy's portal-backed `omarchy file select` command for local image selection
 - Uses `omarchy-launch-terminal` and `omarchy-launch-browser` for user-requested launches

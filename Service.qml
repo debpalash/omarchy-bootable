@@ -1,4 +1,5 @@
 import QtQuick
+import QtCore
 import Quickshell.Io
 
 Item {
@@ -8,6 +9,7 @@ Item {
   property bool guiInstalled: false
   property bool tuiInstalled: false
   property bool clientCapable: false
+  property bool catalogCapable: false
   property bool helperInstalled: false
   property string version: "Not installed"
   property string error: ""
@@ -30,11 +32,39 @@ Item {
   property double progressTotal: 0
   property bool progressKnown: false
   property bool writeTerminalEvent: false
+  property string catalogWorkflow: "idle"
+  property var catalog: []
+  property string catalogQuery: ""
+  property var selectedDistribution: null
+  property var releases: []
+  property string catalogMessage: ""
+  property string catalogError: ""
+  property string downloadDestination: ""
+  property string downloadPhase: ""
+  property double downloadCompleted: 0
+  property double downloadTotal: 0
+  property bool downloadKnown: false
+  property bool downloadTerminalEvent: false
   readonly property bool writing: workflow === "writing"
-  readonly property bool busy: writing || workflow === "inspecting" || workflow === "discovering" || workflow === "planning"
+  readonly property bool downloading: catalogWorkflow === "downloading"
+  readonly property bool catalogBusy: catalogWorkflow === "catalog-loading" || catalogWorkflow === "releases-loading" || downloading
+  readonly property bool busy: writing || downloading || workflow === "inspecting" || workflow === "discovering" || workflow === "planning"
   readonly property bool canWrite: workflow === "review" && acknowledged && writePlan !== null && eligible(selectedTarget)
   readonly property int progressPercent: progressKnown && progressTotal > 0
     ? Math.max(0, Math.min(100, Math.round(progressCompleted * 100 / progressTotal))) : 0
+  readonly property int downloadPercent: downloadKnown && downloadTotal > 0
+    ? Math.max(0, Math.min(100, Math.round(downloadCompleted * 100 / downloadTotal))) : 0
+  readonly property var filteredCatalog: {
+    var query = String(catalogQuery || "").trim().toLowerCase()
+    var rows = []
+    for (var index = 0; index < catalog.length; index++) {
+      var item = catalog[index]
+      var haystack = [item.name || "", item.slug || "", item.based_on || ""].join(" ").toLowerCase()
+      if (query === "" || haystack.indexOf(query) !== -1) rows.push(item)
+      if (rows.length >= 30) break
+    }
+    return rows
+  }
   readonly property int eligibleDeviceCount: {
     var count = 0
     for (var index = 0; index < devices.length; index++) {
@@ -123,6 +153,7 @@ Item {
       guiInstalled = data.guiInstalled === true
       tuiInstalled = data.tuiInstalled === true
       clientCapable = data.clientCapable === true
+      catalogCapable = data.catalogCapable === true
       helperInstalled = data.helperInstalled === true
       version = String(data.version || (installed ? "Installed" : "Not installed"))
       error = ""
@@ -131,6 +162,7 @@ Item {
       guiInstalled = false
       tuiInstalled = false
       clientCapable = false
+      catalogCapable = false
       helperInstalled = false
       version = "Status unavailable"
       error = "Could not read the local Bootable status."
@@ -142,6 +174,90 @@ Item {
     operationError = ""
     pickerProcess.command = ["omarchy", "file", "select", "--title", "Choose an OS image", "--extensions", "iso img raw xz gz zst bz2"]
     pickerProcess.running = true
+  }
+
+  function openCatalog() {
+    if (!clientReady || !catalogCapable || busy || catalogProcess.running) return
+    catalog = []
+    catalogQuery = ""
+    selectedDistribution = null
+    releases = []
+    catalogError = ""
+    catalogMessage = "Loading Bootable's distribution catalog…"
+    catalogWorkflow = "catalog-loading"
+    catalogProcess.command = ["bootable", "catalog", "--limit", "100", "--json"]
+    catalogProcess.running = true
+  }
+
+  function closeCatalog() {
+    if (catalogBusy) return
+    catalogWorkflow = "idle"
+    catalogError = ""
+    selectedDistribution = null
+    releases = []
+  }
+
+  function loadReleases(distribution) {
+    if (!distribution || busy || releasesProcess.running) return
+    selectedDistribution = distribution
+    releases = []
+    catalogError = ""
+    catalogMessage = "Finding current ISO releases for " + String(distribution.name || distribution.slug) + "…"
+    catalogWorkflow = "releases-loading"
+    releasesProcess.command = ["bootable", "releases", String(distribution.slug), "--json"]
+    releasesProcess.running = true
+  }
+
+  function backToCatalog() {
+    if (catalogBusy) return
+    catalogError = ""
+    catalogWorkflow = "catalog"
+  }
+
+  function safeReleaseName(release) {
+    return fileName(String(release && release.name || "bootable-image.iso").replace(/\\/g, "/"))
+  }
+
+  function downloadRelease(release, index) {
+    if (!release || !selectedDistribution || busy || downloadProcess.running) return
+    var downloads = StandardPaths.writableLocation(StandardPaths.DownloadLocation)
+    downloadDestination = downloads + "/" + safeReleaseName(release)
+    downloadPhase = "Preparing"
+    downloadCompleted = 0
+    downloadTotal = Number(release.size || 0)
+    downloadKnown = downloadTotal > 0
+    downloadTerminalEvent = false
+    catalogError = ""
+    catalogMessage = "Downloading and verifying " + safeReleaseName(release) + "…"
+    catalogWorkflow = "downloading"
+    downloadProcess.command = ["bootable", "download", String(selectedDistribution.slug),
+      "--index", String(index), "--output", downloadDestination, "--json-progress"]
+    downloadProcess.running = true
+  }
+
+  function consumeDownloadLine(line) {
+    var value
+    try {
+      value = JSON.parse(String(line || ""))
+    } catch (parseError) {
+      return
+    }
+    if (value.event === "progress" && value.data) {
+      downloadPhase = String(value.data.phase || "Downloading")
+      downloadCompleted = Number(value.data.completed || 0)
+      downloadTotal = Number(value.data.total || 0)
+      downloadKnown = value.data.total !== null && value.data.total !== undefined && downloadTotal > 0
+      catalogMessage = String(value.data.message || downloadPhase)
+    } else if (value.event === "finished") {
+      downloadTerminalEvent = true
+      downloadPhase = "Finished"
+      downloadCompleted = downloadTotal
+      catalogMessage = "Download verified. Inspecting the image…"
+    } else if (value.event === "failed") {
+      downloadTerminalEvent = true
+      catalogError = String(value.data && value.data.message || "Bootable could not download that image.")
+      catalogWorkflow = "catalog-error"
+    }
   }
 
   function inspectImage(path) {
@@ -288,6 +404,74 @@ Item {
     onExited: function(exitCode) {
       if (exitCode === 0) root.inspectImage(String(pickerOutput.text || "").trim())
       else if (exitCode === 2) root.fail(String(pickerError.text || "The file chooser could not open.").trim())
+    }
+  }
+
+  Process {
+    id: catalogProcess
+    running: false
+    command: []
+    stdout: StdioCollector { id: catalogOutput; waitForEnd: true }
+    stderr: StdioCollector { id: catalogErrorOutput; waitForEnd: true }
+    onExited: function(exitCode) {
+      if (exitCode !== 0) {
+        root.catalogError = String(catalogErrorOutput.text || "Bootable could not load the distribution catalog.").trim()
+        root.catalogWorkflow = "catalog-error"
+        return
+      }
+      try {
+        var rows = JSON.parse(String(catalogOutput.text || "[]"))
+        root.catalog = Array.isArray(rows) ? rows : []
+        root.catalogWorkflow = "catalog"
+        root.catalogMessage = root.catalog.length === 0 ? "No distributions returned." : "Choose a distribution."
+      } catch (parseError) {
+        root.catalogError = "Bootable returned an invalid distribution catalog."
+        root.catalogWorkflow = "catalog-error"
+      }
+    }
+  }
+
+  Process {
+    id: releasesProcess
+    running: false
+    command: []
+    stdout: StdioCollector { id: releasesOutput; waitForEnd: true }
+    stderr: StdioCollector { id: releasesErrorOutput; waitForEnd: true }
+    onExited: function(exitCode) {
+      if (exitCode !== 0) {
+        root.catalogError = String(releasesErrorOutput.text || "Bootable could not resolve ISO releases.").trim()
+        root.catalogWorkflow = "catalog-error"
+        return
+      }
+      try {
+        var rows = JSON.parse(String(releasesOutput.text || "[]"))
+        root.releases = Array.isArray(rows) ? rows : []
+        root.catalogWorkflow = "releases"
+        root.catalogMessage = root.releases.length === 0 ? "No ISO releases found." : "Choose an ISO to download and verify."
+      } catch (parseError) {
+        root.catalogError = "Bootable returned an invalid release list."
+        root.catalogWorkflow = "catalog-error"
+      }
+    }
+  }
+
+  Process {
+    id: downloadProcess
+    running: false
+    command: []
+    stdout: SplitParser { onRead: function(line) { root.consumeDownloadLine(line) } }
+    stderr: StdioCollector { id: downloadErrorOutput; waitForEnd: true }
+    onExited: function(exitCode) {
+      if (exitCode === 0 && root.downloadTerminalEvent) {
+        root.catalogWorkflow = "idle"
+        root.inspectImage(root.downloadDestination)
+      } else if (exitCode === 0) {
+        root.catalogError = "Bootable ended the download without a completion event."
+        root.catalogWorkflow = "catalog-error"
+      } else if (root.catalogWorkflow !== "catalog-error") {
+        root.catalogError = String(downloadErrorOutput.text || "Bootable could not download that image.").trim()
+        root.catalogWorkflow = "catalog-error"
+      }
     }
   }
 
