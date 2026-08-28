@@ -43,6 +43,7 @@ jobs:
         run: |
           /usr/lib/qt6/bin/qmlformat Panel.qml >/dev/null
           /usr/lib/qt6/bin/qmlformat Service.qml >/dev/null
+          sh tests/qml-plain-text.sh
 
       - name: Exercise detached download state
         run: tests/download-session.sh

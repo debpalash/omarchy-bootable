@@ -312,6 +312,7 @@ Panel {
                   text: bootable.selectedDistribution
                     ? String(bootable.selectedDistribution.name || "ISO releases")
                     : "DISCOVER IMAGES"
+                  textFormat: Text.PlainText
                   color: root.foreground
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
@@ -371,6 +372,7 @@ Panel {
                 width: parent.width
                 visible: bootable.catalogWorkflow === "catalog"
                 text: bootable.catalogResultText
+                textFormat: Text.PlainText
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -852,6 +854,7 @@ Panel {
         Text {
           Layout.fillWidth: true
           text: cardContent.parent.title
+          textFormat: Text.PlainText
           color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -861,6 +864,7 @@ Panel {
         Text {
           Layout.fillWidth: true
           text: cardContent.parent.detail
+          textFormat: Text.PlainText
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -893,6 +897,7 @@ Panel {
       Text {
         Layout.fillWidth: true
         text: bootable.removableStatusText
+        textFormat: Text.PlainText
         color: bootable.eligibleDeviceCount > 0 ? root.foreground : root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
@@ -1100,6 +1105,7 @@ Panel {
         Text {
           Layout.fillWidth: true
           text: bootable.deviceName(device)
+          textFormat: Text.PlainText
           color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -1108,6 +1114,7 @@ Panel {
         Text {
           Layout.fillWidth: true
           text: String(device.path || "") + " · " + bootable.formatBytes(device.capacity)
+          textFormat: Text.PlainText
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -1116,6 +1123,7 @@ Panel {
         Text {
           Layout.fillWidth: true
           text: bootable.eligibility(device)
+          textFormat: Text.PlainText
           color: bootable.eligible(device) ? root.accent : root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -1246,6 +1254,7 @@ Panel {
         Text {
           Layout.fillWidth: true
           text: actionRow.title
+          textFormat: Text.PlainText
           color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -1254,6 +1263,7 @@ Panel {
         Text {
           Layout.fillWidth: true
           text: actionRow.detail
+          textFormat: Text.PlainText
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
