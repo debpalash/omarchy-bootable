@@ -21,6 +21,17 @@ Panel {
   readonly property string repositoryUrl: "https://github.com/debpalash/bootable"
   property bool showMore: false
 
+  readonly property int compactPanelHeight: {
+    if (showMore) return Style.space(560)
+    if (!bootable.clientReady) return Style.space(300)
+    if (bootable.workflow === "target") return Style.space(500)
+    if (bootable.workflow === "review") return Style.space(540)
+    if (bootable.workflow === "writing") return Style.space(430)
+    if (bootable.workflow === "finished") return Style.space(350)
+    if (bootable.workflow === "error") return Style.space(410)
+    return Style.space(285)
+  }
+
   function launchGui() {
     if (!bootable.guiInstalled) return
     Quickshell.execDetached(["bootable-desktop"])
@@ -119,8 +130,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(400))
-    contentHeight: panel.fittedContentHeight(Math.min(content.implicitHeight, Style.space(680)), Style.space(680))
+    contentWidth: panel.fittedContentWidth(Style.space(360))
+    contentHeight: panel.fittedContentHeight(Math.min(content.implicitHeight, root.compactPanelHeight), root.compactPanelHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -173,21 +184,15 @@ Panel {
             }
           }
 
-          Text {
-            width: parent.width
-            text: bootable.writing
-              ? "You can close this panel. Writing and verification continue."
-              : "Choose image → select USB → review erase → flash."
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            wrapMode: Text.WordWrap
-          }
-
           PanelSectionHeader {
-            text: "FLASH MEDIA"
+            text: bootable.writing ? "FLASHING MEDIA" : "CREATE MEDIA"
             foreground: root.foreground
             fontFamily: root.fontFamily
+          }
+
+          DeviceStatusRow {
+            width: parent.width
+            visible: bootable.clientReady
           }
 
           Column {
@@ -248,28 +253,10 @@ Panel {
               spacing: Style.space(6)
               visible: bootable.workflow === "target" && bootable.imageReport !== null && bootable.sourcePath !== ""
 
-              Row {
-                width: parent.width
-                spacing: Style.space(8)
-
-                Text {
-                  width: parent.width - refreshButton.width - parent.spacing
-                  text: "TARGET DRIVE"
-                  color: root.dim
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  font.bold: true
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-
-                PanelActionButton {
-                  id: refreshButton
-                  iconText: "󰑐"
-                  tooltipText: "Refresh drives"
-                  foreground: root.foreground
-                  fontFamily: root.fontFamily
-                  onClicked: bootable.refreshDevices()
-                }
+              PanelSectionHeader {
+                text: "SELECT TARGET"
+                foreground: root.foreground
+                fontFamily: root.fontFamily
               }
 
               Repeater {
@@ -285,7 +272,7 @@ Panel {
               Text {
                 width: parent.width
                 visible: bootable.devices.length === 0
-                text: "No removable drive detected. Connect one, then refresh. Bootable will not choose a disk automatically."
+                text: "Connect a removable USB drive, then refresh. Nothing is selected automatically."
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
@@ -449,10 +436,9 @@ Panel {
 
           }
 
-          ActionRow {
+          CompactActionRow {
             width: parent.width
-            title: root.showMore ? "Hide extra options" : "More Bootable options"
-            detail: "Full GUI, TUI, downloads, docs, and AI help"
+            title: root.showMore ? "Hide full-app links" : "Open GUI, TUI, downloads, or AI help"
             glyph: root.showMore ? "󰅀" : "󰅂"
             shortcut: "M"
             enabled: !bootable.writing
@@ -604,6 +590,85 @@ Panel {
           wrapMode: Text.WordWrap
         }
       }
+    }
+  }
+
+  component DeviceStatusRow: Rectangle {
+    implicitHeight: Style.space(42)
+    radius: Style.cornerRadius
+    color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.045)
+    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.12)
+    border.width: 1
+
+    RowLayout {
+      anchors.fill: parent
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(6)
+      spacing: Style.space(8)
+
+      Text {
+        text: bootable.devicesError !== "" ? "󰅚" : (bootable.eligibleDeviceCount > 0 ? "󰕓" : "󰋌")
+        color: bootable.devicesError !== "" ? root.urgent : (bootable.eligibleDeviceCount > 0 ? root.accent : root.dim)
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+      }
+
+      Text {
+        Layout.fillWidth: true
+        text: bootable.removableStatusText
+        color: bootable.eligibleDeviceCount > 0 ? root.foreground : root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        elide: Text.ElideRight
+      }
+
+      PanelActionButton {
+        iconText: bootable.devicesLoading ? "󰔟" : "󰑐"
+        tooltipText: bootable.devicesError !== "" ? "Retry drive check" : "Refresh removable drives"
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        enabled: !bootable.devicesLoading && !bootable.writing
+        onClicked: bootable.refreshDevices()
+      }
+    }
+  }
+
+  component CompactActionRow: CursorSurface {
+    id: compactAction
+    property string title: ""
+    property string glyph: ""
+    property string shortcut: ""
+    signal triggered()
+
+    foreground: root.foreground
+    implicitHeight: Style.space(38)
+    height: implicitHeight
+    opacity: enabled ? 1.0 : 0.45
+
+    MouseArea {
+      anchors.fill: parent
+      enabled: compactAction.enabled
+      hoverEnabled: true
+      cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+      onClicked: compactAction.triggered()
+    }
+
+    RowLayout {
+      anchors.fill: parent
+      anchors.leftMargin: Style.space(8)
+      anchors.rightMargin: Style.space(8)
+      spacing: Style.space(8)
+      Text { text: compactAction.glyph; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+      Text {
+        Layout.fillWidth: true
+        text: compactAction.title
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        elide: Text.ElideRight
+      }
+      Text { text: compactAction.shortcut; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+      Text { text: "󰁔"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body }
     }
   }
 
