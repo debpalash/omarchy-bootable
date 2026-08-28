@@ -45,6 +45,8 @@ Item {
   property double downloadTotal: 0
   property bool downloadKnown: false
   property bool downloadTerminalEvent: false
+  property bool downloadSessionStarting: false
+  property bool downloadCompletionHandled: false
   readonly property bool writing: workflow === "writing"
   readonly property bool downloading: catalogWorkflow === "downloading"
   readonly property bool catalogBusy: catalogWorkflow === "catalog-loading" || catalogWorkflow === "releases-loading" || downloading
@@ -85,6 +87,10 @@ Item {
 
   function helperPath() {
     return Qt.resolvedUrl("bootable-status").toString().replace(/^file:\/\//, "")
+  }
+
+  function downloadSessionPath() {
+    return Qt.resolvedUrl("bootable-download-session").toString().replace(/^file:\/\//, "")
   }
 
   function fileName(path) {
@@ -144,7 +150,7 @@ Item {
       statusProcess.command = [helperPath()]
       statusProcess.running = true
     }
-    if (clientReady && !writing) refreshDevices()
+    if (clientReady && !writing && !downloading) refreshDevices()
   }
 
   function applyStatus(raw) {
@@ -157,7 +163,8 @@ Item {
       helperInstalled = data.helperInstalled === true
       version = String(data.version || (installed ? "Installed" : "Not installed"))
       error = ""
-      if (clientReady && workflow !== "writing") refreshDevices()
+      if (clientReady && workflow !== "writing" && !downloading) refreshDevices()
+      if (clientReady && downloading) checkDownloadSession()
     } catch (parseError) {
       guiInstalled = false
       tuiInstalled = false
@@ -215,11 +222,13 @@ Item {
   }
 
   function safeReleaseName(release) {
-    return fileName(String(release && release.name || "bootable-image.iso").replace(/\\/g, "/"))
+    var name = fileName(String(release && release.name || "bootable-image.iso").replace(/\\/g, "/"))
+      .replace(/[^A-Za-z0-9._+() -]/g, "_").trim()
+    return name === "" || name === "." || name === ".." ? "bootable-image.iso" : name
   }
 
   function downloadRelease(release, index) {
-    if (!release || !selectedDistribution || busy || downloadProcess.running) return
+    if (!release || !selectedDistribution || busy || downloadSessionProcess.running) return
     var downloads = StandardPaths.writableLocation(StandardPaths.DownloadLocation)
     downloadDestination = downloads + "/" + safeReleaseName(release)
     downloadPhase = "Preparing"
@@ -227,21 +236,19 @@ Item {
     downloadTotal = Number(release.size || 0)
     downloadKnown = downloadTotal > 0
     downloadTerminalEvent = false
+    downloadCompletionHandled = false
+    downloadSessionStarting = true
     catalogError = ""
     catalogMessage = "Downloading and verifying " + safeReleaseName(release) + "…"
     catalogWorkflow = "downloading"
-    downloadProcess.command = ["bootable", "download", String(selectedDistribution.slug),
-      "--index", String(index), "--output", downloadDestination, "--json-progress"]
-    downloadProcess.running = true
+    downloadSessionProcess.action = "start"
+    downloadSessionProcess.command = [downloadSessionPath(), "start", String(selectedDistribution.slug),
+      String(index), downloadDestination]
+    downloadSessionProcess.running = true
   }
 
-  function consumeDownloadLine(line) {
-    var value
-    try {
-      value = JSON.parse(String(line || ""))
-    } catch (parseError) {
-      return
-    }
+  function consumeDownloadEvent(value) {
+    if (!value) return
     if (value.event === "progress" && value.data) {
       downloadPhase = String(value.data.phase || "Downloading")
       downloadCompleted = Number(value.data.completed || 0)
@@ -256,6 +263,69 @@ Item {
     } else if (value.event === "failed") {
       downloadTerminalEvent = true
       catalogError = String(value.data && value.data.message || "Bootable could not download that image.")
+    }
+  }
+
+  function checkDownloadSession() {
+    if (downloadSessionStatusProcess.running) return
+    downloadSessionStatusProcess.command = [downloadSessionPath(), "status"]
+    downloadSessionStatusProcess.running = true
+  }
+
+  function clearDownloadSession() {
+    if (downloadSessionProcess.running) return
+    downloadSessionProcess.action = "clear"
+    downloadSessionProcess.command = [downloadSessionPath(), "clear"]
+    downloadSessionProcess.running = true
+  }
+
+  function applyDownloadSessionStatus(raw) {
+    var data
+    try {
+      data = JSON.parse(String(raw || ""))
+    } catch (parseError) {
+      return
+    }
+
+    if (data.destination) downloadDestination = String(data.destination)
+    if (data.event) consumeDownloadEvent(data.event)
+
+    if (data.active === true) {
+      downloadSessionStarting = false
+      downloadCompletionHandled = false
+      if (catalogWorkflow !== "catalog-error") catalogWorkflow = "downloading"
+      if (!data.event) {
+        downloadPhase = "Preparing"
+        catalogMessage = "Bootable is preparing the detached download…"
+      }
+      return
+    }
+
+    if (data.event && data.event.event === "finished") {
+      if (!clientReady || downloadCompletionHandled) {
+        catalogWorkflow = "downloading"
+        return
+      }
+      downloadCompletionHandled = true
+      downloadSessionStarting = false
+      clearDownloadSession()
+      catalogWorkflow = "idle"
+      inspectImage(downloadDestination)
+      return
+    }
+
+    if (data.event && data.event.event === "failed") {
+      downloadCompletionHandled = true
+      downloadSessionStarting = false
+      if (catalogError === "") catalogError = String(data.error || "Bootable could not download that image.")
+      catalogWorkflow = "catalog-error"
+      clearDownloadSession()
+      return
+    }
+
+    if (downloadSessionStarting) return
+    if (catalogWorkflow === "downloading" && !downloadCompletionHandled) {
+      catalogError = String(data.error || "The detached Bootable download stopped without a completion event.")
       catalogWorkflow = "catalog-error"
     }
   }
@@ -275,7 +345,7 @@ Item {
   }
 
   function refreshDevices() {
-    if (!clientReady || devicesProcess.running || writing) return
+    if (!clientReady || devicesProcess.running || writing || downloading) return
     selectedTarget = null
     writePlan = null
     acknowledged = false
@@ -456,23 +526,46 @@ Item {
   }
 
   Process {
-    id: downloadProcess
+    id: downloadSessionProcess
+    property string action: ""
     running: false
     command: []
-    stdout: SplitParser { onRead: function(line) { root.consumeDownloadLine(line) } }
-    stderr: StdioCollector { id: downloadErrorOutput; waitForEnd: true }
+    stdout: StdioCollector { id: downloadSessionOutput; waitForEnd: true }
+    stderr: StdioCollector { id: downloadSessionError; waitForEnd: true }
     onExited: function(exitCode) {
-      if (exitCode === 0 && root.downloadTerminalEvent) {
-        root.catalogWorkflow = "idle"
-        root.inspectImage(root.downloadDestination)
-      } else if (exitCode === 0) {
-        root.catalogError = "Bootable ended the download without a completion event."
+      var completedAction = action
+      action = ""
+      if (completedAction !== "start") return
+      root.downloadSessionStarting = false
+      if (exitCode !== 0) {
+        root.catalogError = String(downloadSessionError.text || "Could not start the detached Bootable download.").trim()
         root.catalogWorkflow = "catalog-error"
-      } else if (root.catalogWorkflow !== "catalog-error") {
-        root.catalogError = String(downloadErrorOutput.text || "Bootable could not download that image.").trim()
+        return
+      }
+      root.checkDownloadSession()
+    }
+  }
+
+  Process {
+    id: downloadSessionStatusProcess
+    running: false
+    command: []
+    stdout: StdioCollector { id: downloadSessionStatusOutput; waitForEnd: true }
+    stderr: StdioCollector { id: downloadSessionStatusError; waitForEnd: true }
+    onExited: function(exitCode) {
+      if (exitCode === 0) root.applyDownloadSessionStatus(downloadSessionStatusOutput.text)
+      else if (root.downloading) {
+        root.catalogError = String(downloadSessionStatusError.text || "Could not restore the Bootable download status.").trim()
         root.catalogWorkflow = "catalog-error"
       }
     }
+  }
+
+  Timer {
+    interval: 750
+    repeat: true
+    running: root.downloading || root.downloadSessionStarting
+    onTriggered: root.checkDownloadSession()
   }
 
   Process {
@@ -580,5 +673,8 @@ Item {
     }
   }
 
-  Component.onCompleted: refresh()
+  Component.onCompleted: {
+    checkDownloadSession()
+    refresh()
+  }
 }

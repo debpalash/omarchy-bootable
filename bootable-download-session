@@ -1,0 +1,114 @@
+#!/usr/bin/env sh
+set -eu
+
+state_home=${XDG_STATE_HOME:-"$HOME/.local/state"}
+state_dir="$state_home/omarchy-bootable/download"
+events_file="$state_dir/events.ndjson"
+errors_file="$state_dir/error.log"
+destination_file="$state_dir/destination"
+unit=omarchy-bootable-download.service
+
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g; s//\\r/g'
+}
+
+is_active() {
+  systemctl --user is-active --quiet "$unit"
+}
+
+status() {
+  active=false
+  if is_active; then
+    active=true
+  fi
+
+  destination=""
+  if [ -f "$destination_file" ]; then
+    destination=$(sed -n '1p' "$destination_file")
+  fi
+
+  event=null
+  if [ -s "$events_file" ]; then
+    candidate=$(tail -n 1 "$events_file")
+    case "$candidate" in
+      \{*\}) event=$candidate ;;
+    esac
+  fi
+
+  error=""
+  if [ -s "$errors_file" ]; then
+    error=$(tail -n 1 "$errors_file")
+  fi
+
+  printf '{"active":%s,"destination":"%s","event":%s,"error":"%s"}\n' \
+    "$active" "$(json_escape "$destination")" "$event" "$(json_escape "$error")"
+}
+
+start() {
+  if [ "$#" -ne 3 ]; then
+    printf 'usage: %s start DISTRO INDEX DESTINATION\n' "$0" >&2
+    exit 2
+  fi
+
+  slug=$1
+  index=$2
+  destination=$3
+
+  case "$slug" in
+    ''|*[!A-Za-z0-9._-]*) printf 'invalid distribution slug\n' >&2; exit 2 ;;
+  esac
+  case "$index" in
+    ''|*[!0-9]*) printf 'invalid release index\n' >&2; exit 2 ;;
+  esac
+  case "$destination" in
+    "$HOME"/*) ;;
+    *) printf 'download destination must be inside the current user home\n' >&2; exit 2 ;;
+  esac
+  if printf '%s' "$destination" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+    printf 'download destination contains control characters\n' >&2
+    exit 2
+  fi
+
+  if is_active; then
+    printf 'a Bootable download is already active\n' >&2
+    exit 3
+  fi
+
+  bootable_path=$(command -v bootable 2>/dev/null || true)
+  if [ -z "$bootable_path" ]; then
+    printf 'bootable is not installed\n' >&2
+    exit 127
+  fi
+
+  mkdir -p "$state_dir"
+  chmod 700 "$state_dir"
+  : > "$events_file"
+  : > "$errors_file"
+  printf '%s\n' "$destination" > "$destination_file"
+  chmod 600 "$events_file" "$errors_file" "$destination_file"
+
+  if ! systemd-run --user --quiet --collect \
+    --unit="${unit%.service}" \
+    --property="StandardOutput=append:$events_file" \
+    --property="StandardError=append:$errors_file" \
+    "$bootable_path" download "$slug" --index "$index" \
+    --output "$destination" --json-progress; then
+    printf 'could not start the detached Bootable download\n' >&2
+    exit 1
+  fi
+}
+
+clear() {
+  if is_active; then
+    printf 'cannot clear an active Bootable download\n' >&2
+    exit 3
+  fi
+  rm -f "$events_file" "$errors_file" "$destination_file"
+}
+
+case "${1:-status}" in
+  start) shift; start "$@" ;;
+  status) status ;;
+  clear) clear ;;
+  *) printf 'usage: %s {start|status|clear}\n' "$0" >&2; exit 2 ;;
+esac
