@@ -56,8 +56,9 @@ Panel {
       + "; privileged helper: " + (bootable.helperInstalled ? "installed" : "missing")
       + "; detected version: " + bootable.version
     var prompt = "Help me " + task + " for Bootable (https://github.com/debpalash/bootable) on this Omarchy system. "
-      + "Inspect the machine and current stable release before acting. Local status: " + localStatus + ". "
-      + "Prefer the official stable package or archive appropriate for this Arch-based machine, verify its published SHA-256 checksum, and install both bootable interfaces plus the root-owned privileged helper and polkit policy. "
+      + "Inspect the live machine plus current stable and published release-candidate channels before acting. Local status: " + localStatus + ". "
+      + "Bootable's in-panel client requires version 0.1.2 or newer with write --json-progress. Never downgrade a newer compatible published build to an older stable release that lacks this capability. "
+      + "Prefer stable when it satisfies the client requirement; otherwise use the newest published release candidate for this Arch-based machine. Verify the chosen artifact's published SHA-256 checksum, and ensure both Bootable interfaces plus the root-owned privileged helper and polkit policy are installed. "
       + "Explain any system change and ask before privileged or destructive actions. Never write to removable media, select a storage device, or weaken Bootable's device-selection and confirmation safety gates."
     Quickshell.execDetached(["omarchy", "agent", "prompt", prompt])
     close()

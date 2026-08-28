@@ -39,7 +39,7 @@ Removal deletes only this plugin's Omarchy-managed checkout and settings. The pl
 - Optional: `bootable-desktop` for the full GUI action
 - Uses Omarchy's portal-backed `omarchy file select` command for local image selection
 - Uses `omarchy-launch-terminal` and `omarchy-launch-browser` for user-requested launches
-- Uses `omarchy agent prompt` for user-requested installation or troubleshooting sessions with the configured default coding agent
+- Uses `omarchy agent prompt` for user-requested installation or troubleshooting sessions with the configured default coding agent; the prompt forbids downgrading a compatible published RC to a stable release that lacks client mode
 - Runs a bundled read-only status helper that checks `PATH`, `bootable --version`, client-mode support, and fixed helper locations
 - Starts a write only after the user chooses an eligible device and acknowledges Bootable's exact reviewed erase plan
 - Does not use `sudo`, access GitHub APIs, auto-select storage, accept arbitrary privileged commands, or weaken fixed-disk protections
