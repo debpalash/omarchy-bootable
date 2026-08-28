@@ -10,6 +10,8 @@ omarchy plugin add https://github.com/debpalash/omarchy-bootable.git --enable --
 
 The Bootable icon appears in the right side of the Omarchy bar. Click it to open the panel. Press `C` to choose a local image, `S` to search the ISO catalog, `R` to refresh removable drives, `G` for the GUI, `T` for the TUI, or `A` for AI troubleshooting.
 
+After loading an image, select its source row to return to the Local image and Discover ISO choices. This lets pointer users switch files or distributions without leaving the client; the `C` and `S` shortcuts remain available directly.
+
 The plugin delegates its media workflow to Bootable's CLI API: `catalog --json` → `releases --json` → `download --json-progress` → `inspect --json` → `devices --json` → `plan --json` → `write --json-progress`. Distribution results stay inside a bounded scrolling list. A verified download is automatically loaded as the source image, but target selection and erase acknowledgement remain explicit.
 
 Downloads run as a detached per-user systemd service and keep their progress under the user's XDG state directory. Closing the panel, moving it out of view, or restarting Omarchy Shell does not interrupt the transfer; reopening the panel restores the latest phase, byte count, percentage, speed, and ETA reported by Bootable. Only one managed ISO download runs at a time.

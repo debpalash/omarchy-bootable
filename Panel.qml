@@ -282,12 +282,12 @@ Panel {
               visible: bootable.sourcePath !== "" && bootable.catalogWorkflow === "idle"
               title: bootable.fileName(bootable.sourcePath)
               detail: bootable.imageReport
-                ? bootable.imageKind(bootable.imageReport) + " · " + bootable.formatBytes(bootable.imageReport.size)
-                : "ISO, IMG, RAW, or compressed disk image"
+                ? bootable.imageKind(bootable.imageReport) + " · " + bootable.formatBytes(bootable.imageReport.size) + " · Change source"
+                : "ISO, IMG, RAW, or compressed disk image · Change source"
               glyph: "󰈙"
-              shortcut: "C"
+              shortcut: "↺"
               enabled: !bootable.busy
-              onTriggered: bootable.chooseImage()
+              onTriggered: bootable.resetWorkflow()
             }
 
             Column {
