@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validators
+        run: sudo apt-get update && sudo apt-get install --yes shellcheck qt6-declarative-dev-tools
+
+      - name: Validate manifest
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(Path("manifest.json").read_text())
+          required = {"schemaVersion", "id", "name", "version", "author", "license", "description"}
+          missing = sorted(required - manifest.keys())
+          if missing:
+              raise SystemExit(f"missing manifest fields: {', '.join(missing)}")
+          if manifest["schemaVersion"] != 1:
+              raise SystemExit("unsupported manifest schema")
+          if not manifest["id"].startswith("io.github."):
+              raise SystemExit("plugin id must use the io.github namespace")
+          PY
+
+      - name: Validate helpers
+        run: |
+          sh -n bootable-status bootable-download-session
+          shellcheck bootable-status bootable-download-session
+
+      - name: Validate QML syntax
+        run: qmllint Panel.qml Service.qml
+
+      - name: Exercise detached download state
+        run: tests/download-session.sh
