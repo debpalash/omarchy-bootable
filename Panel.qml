@@ -13,9 +13,10 @@ Panel {
   manageIpc: false
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
-  readonly property color dim: Qt.darker(foreground, 1.55)
+  readonly property color dim: Qt.darker(foreground, 1.35)
   readonly property color accent: Color.accent
   readonly property color urgent: bar ? bar.urgent : Color.urgent
+  readonly property color panelSurface: Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 0.985)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property string releaseUrl: "https://github.com/debpalash/bootable/releases/latest"
   readonly property string repositoryUrl: "https://github.com/debpalash/bootable"
@@ -173,9 +174,16 @@ Panel {
         else if ((text === "r" || text === "R") && !bootable.writing) bootable.refreshDevices()
       }
 
+      Rectangle {
+        anchors.fill: parent
+        radius: Style.cornerRadius
+        color: root.panelSurface
+      }
+
       Flickable {
         id: scroll
         anchors.fill: parent
+        anchors.bottomMargin: stickyHelp.implicitHeight + Style.space(8)
         clip: true
         contentWidth: width
         contentHeight: content.implicitHeight
@@ -191,7 +199,7 @@ Panel {
           PanelHero {
             width: parent.width
             title: "Bootable"
-            meta: bootable.loading ? "Checking local installation…" : bootable.version
+            meta: bootable.loading ? "Checking local installation…" : bootable.appVersionLabel
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconComponent: Component {
@@ -212,7 +220,7 @@ Panel {
 
           DeviceStatusRow {
             width: parent.width
-            visible: bootable.clientReady
+            visible: bootable.clientReady && bootable.catalogWorkflow === "idle"
           }
 
           Column {
@@ -312,7 +320,7 @@ Panel {
                 }
 
                 PanelActionButton {
-                  iconText: "󰅁"
+                  iconText: bootable.selectedDistribution ? "󰅁" : "󰅖"
                   tooltipText: bootable.selectedDistribution ? "Back to catalog" : "Close catalog"
                   foreground: root.foreground
                   fontFamily: root.fontFamily
@@ -334,7 +342,7 @@ Panel {
                 id: catalogSearch
                 width: parent.width
                 visible: bootable.catalogWorkflow === "catalog"
-                placeholderText: "Search distributions or base…"
+                placeholderText: "Search by name, slug, or base family…"
                 text: bootable.catalogQuery
                 color: root.foreground
                 placeholderTextColor: root.dim
@@ -343,8 +351,8 @@ Panel {
                 selectByMouse: true
                 background: Rectangle {
                   radius: Style.cornerRadius
-                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.055)
-                  border.color: catalogSearch.activeFocus ? root.accent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18)
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.10)
+                  border.color: catalogSearch.activeFocus ? root.accent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.28)
                   border.width: 1
                 }
                 onTextChanged: bootable.catalogQuery = text
@@ -357,6 +365,16 @@ Panel {
                   catalogSearch.focus = false
                   keyCatcher.forceActiveFocus()
                 }
+              }
+
+              Text {
+                width: parent.width
+                visible: bootable.catalogWorkflow === "catalog"
+                text: bootable.catalogResultText
+                color: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                elide: Text.ElideRight
               }
 
               Flickable {
@@ -375,6 +393,15 @@ Panel {
                   width: catalogResults.width - Style.space(8)
                   spacing: Style.space(4)
 
+                  StatusCard {
+                    width: parent.width
+                    visible: bootable.catalogWorkflow === "catalog" && bootable.filteredCatalog.length === 0
+                    glyph: "󰍉"
+                    title: bootable.catalogResultText
+                    detail: "Try another name, slug, or base family."
+                    tone: root.dim
+                  }
+
                   Repeater {
                     model: bootable.catalogWorkflow === "catalog" ? bootable.filteredCatalog : []
                     delegate: ActionRow {
@@ -384,6 +411,7 @@ Panel {
                       detail: "#" + String(modelData.rank || "–") + " · " + String(modelData.based_on || "Independent")
                       glyph: "󰣇"
                       shortcut: ""
+                      actionLabel: "Select"
                       onTriggered: bootable.loadReleases(modelData)
                     }
                   }
@@ -399,6 +427,7 @@ Panel {
                         + (modelData.checksum ? " · publisher checksum" : " · checksum unavailable")
                       glyph: "󰇚"
                       shortcut: ""
+                      actionLabel: "Download"
                       onTriggered: bootable.downloadRelease(modelData, index)
                     }
                   }
@@ -767,19 +796,23 @@ Panel {
             }
           }
 
-          Text {
-            width: parent.width
-            text: bootable.catalogWorkflow === "idle"
-              ? "C local  ·  S discover  ·  M more  ·  Esc close"
-              : (bootable.downloading
-                ? "Safe to close · download continues"
-                : (catalogSearch.activeFocus ? "Enter search  ·  Esc leave search" : "Scroll to browse  ·  Esc close"))
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            horizontalAlignment: Text.AlignHCenter
-          }
         }
+      }
+
+      Text {
+        id: stickyHelp
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        text: bootable.catalogWorkflow === "idle"
+          ? "C local  ·  S discover  ·  M more  ·  Esc close"
+          : (bootable.downloading
+            ? "Safe to close · download continues"
+            : (catalogSearch.activeFocus ? "Results update live  ·  Esc leaves search" : "Scroll to browse  ·  Esc close"))
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        horizontalAlignment: Text.AlignHCenter
       }
     }
   }
@@ -864,6 +897,14 @@ Panel {
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
         elide: Text.ElideRight
+      }
+
+      Text {
+        visible: !bootable.devicesLoading
+        text: bootable.devicesError !== "" ? "Retry" : "Refresh"
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
       }
 
       PanelActionButton {
@@ -1083,10 +1124,11 @@ Panel {
 
       Text {
         visible: bootable.eligible(device)
-        text: "󰁔"
-        color: root.dim
+        text: "Select"
+        color: root.accent
         font.family: root.fontFamily
-        font.pixelSize: Style.font.body
+        font.pixelSize: Style.font.caption
+        font.bold: true
       }
     }
   }
@@ -1167,6 +1209,7 @@ Panel {
     property string detail: ""
     property string glyph: ""
     property string shortcut: ""
+    property string actionLabel: ""
     signal triggered()
 
     foreground: root.foreground
@@ -1226,7 +1269,17 @@ Panel {
         font.pixelSize: Style.font.caption
       }
 
+      Text {
+        visible: actionRow.actionLabel !== ""
+        text: actionRow.actionLabel
+        color: root.accent
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+      }
+
       PanelActionButton {
+        visible: actionRow.actionLabel === ""
         iconText: "󰁔"
         tooltipText: actionRow.title
         foreground: root.foreground
