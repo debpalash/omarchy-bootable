@@ -229,7 +229,13 @@ Item {
 
   function downloadRelease(release, index) {
     if (!release || !selectedDistribution || busy || downloadSessionProcess.running) return
-    var downloads = StandardPaths.writableLocation(StandardPaths.DownloadLocation)
+    var downloads = String(StandardPaths.writableLocation(StandardPaths.DownloadLocation) || "")
+      .replace(/^file:\/\//, "")
+    try {
+      downloads = decodeURIComponent(downloads)
+    } catch (decodeError) {
+      // Keep Qt's original path if it contains a malformed escape sequence.
+    }
     downloadDestination = downloads + "/" + safeReleaseName(release)
     downloadPhase = "Preparing"
     downloadCompleted = 0

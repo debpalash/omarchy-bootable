@@ -159,7 +159,7 @@ Panel {
     contentWidth: panel.fittedContentWidth(Style.space(360))
     contentHeight: bootable.catalogWorkflow === "idle"
       ? panel.fittedContentHeight(Math.min(content.implicitHeight, root.compactPanelHeight), root.compactPanelHeight)
-      : panel.fittedContentHeight(root.compactPanelHeight, root.compactPanelHeight)
+      : root.compactPanelHeight
 
     PanelKeyCatcher {
       id: keyCatcher
